@@ -10,7 +10,7 @@ A simple, offline CLI app to help Muslims **track, reflect, and grow** in their 
 It allows you to log daily learning efforts like:
 
 - 🕋 **Qur'an Tafseer study**  
-- 🎙️ **Qur'an Tilawat (recitation/manzil)**  
+- 🎙️ **Qur'an Tilawat (Recitation/Manzil)**  
 - 📚 **Other subjects** (Islamic studies, Arabic, general knowledge, school material, etc.)
 
 It is ideal for:
