@@ -1,5 +1,5 @@
 import random
-from entries import TafseerEntry, ManzilEntry, OtherEntry
+from entries import TafseerEntry, TilawatEntry, OtherEntry
 from file_manager import DataManager
 from stats_manager import StatsManager
 from core_utils import (Validation, PasswordManager, DateManager,
@@ -25,42 +25,42 @@ class ProgressLogger:
             method_full = f"Al-Qur'an ({method})"
             print(f"\n<><><>__( {method_full} )__<><><>")
             while True:
-                Para_number, _ = Validation.get_first_and_last("Para", 30)
+                Para_number = Validation.get_first_and_last("Para", 30)[0]
                 Para = f"Para no. {Para_number}"
                 if method == "Tafseer":
                     entry = TafseerEntry.from_user_input(method_full)
                 else:
-                    entry = ManzilEntry.from_user_input(method_full)                
+                    entry = TilawatEntry.from_user_input(method_full)                
                 data.append_entry(method_full, Para, entry.to_dict())
                 if validate_choice(
                     f"\nDo you want to add another {method_full} entry to the log?", ["Y", "N"]) == "N":
                     return
 
 
-    class OtherCategories: 
+    class OtherSubjects: 
 
         @classmethod
-        def get_category_books(cls) -> tuple:
-            if StatsManager.get_all_time_categories():
-                categories_list = [
-                    "New Category",
-                    *StatsManager.get_all_time_categories().keys()
+        def get_subject_books(cls) -> tuple:
+            if StatsManager.get_all_time_subjects():
+                subjects_list = [
+                    "New Subject",
+                    *StatsManager.get_all_time_subjects().keys()
                 ]
-                categories_menu = Menu(categories_list, "Select a Category")
-                user_choice = categories_menu.display_menu(show_exit=False)
+                subjects_menu = Menu(subjects_list, "Select a Subject")
+                user_choice = subjects_menu.display_menu(show_exit=False)
                 if user_choice != 1:
-                    category = categories_list[user_choice - 1] # type: ignore
-                    return category, StatsManager.get_all_time_categories(
-                    )[category]
+                    subject = subjects_list[user_choice - 1] # type: ignore
+                    return subject, StatsManager.get_all_time_subjects(
+                    )[subject]
             while True:
-                category = input("\nEnter a category name: ").strip()
-                category = "Qur'an" if category == "Al-Qur'an (Tafseer)" else category
-                if category:
-                    return category, None
-                print("\nCategory cannot be blank.")
+                subject = input("\nEnter a subject name: ").strip()
+                subject = "Qur'an" if subject == "Al-Qur'an (Tafseer)" else subject
+                if subject:
+                    return subject, None
+                print("\nSubject cannot be blank.")
 
         @classmethod
-        def get_book_name(cls, category: str, books_list: list) -> str:
+        def get_book_name(cls, subject: str, books_list: list) -> str:
             if books_list:
                 books_menu_list = ["New Book", *books_list]
                 books_menu = Menu(books_menu_list, "Select a book")
@@ -69,20 +69,20 @@ class ProgressLogger:
                     return books_menu_list[user_choice - 1] # type: ignore
             while True:
                 book = input(
-                    f"Enter the {category} book or material title: ").strip()
+                    f"Enter the \"{subject}\" book or material title: ").strip()
                 if book:
                     return book
                 print("\nBook title cannot be blank.")
 
         @classmethod
         def get_and_add_progress(cls, data: DataManager) -> None:
-            StatsManager.build_categories_cache(data)
-            category, books_list = cls.get_category_books()
-            print(f"\n<><><>__(<<[ {category} ]>>)__<><><>\n")
-            book_name = cls.get_book_name(category, books_list)
+            StatsManager.build_subjects_cache(data)
+            subject, books_list = cls.get_subject_books()
+            print(f"\n<><><>__(<<[ {subject} ]>>)__<><><>\n")
+            book_name = cls.get_book_name(subject, books_list)
             print(f"\n<><><>__(<< {book_name} >>)__<><><>\n")
             entry = OtherEntry.from_user_input(book_name)
-            data.append_entry(category, book_name, entry.to_dict())
+            data.append_entry(subject, book_name, entry.to_dict())
 
         @classmethod
         def log_other_progress(cls, data: DataManager) -> None:
@@ -111,8 +111,8 @@ class ProgressEditor:
             pop_first_dict(main_dict, dict1)
 
     @classmethod
-    def edit_category(cls, category: str, editable_entries: list, entry_instance):
-        entries_menu = Menu(editable_entries, category)
+    def edit_subject(cls, subject: str, editable_entries: list, entry_instance):
+        entries_menu = Menu(editable_entries, subject)
         while True:
             user_choice, exit_option = entries_menu.display_menu() # type: ignore
             if user_choice == exit_option:
@@ -127,22 +127,22 @@ class ProgressEditor:
             if not progress:
                 print("\nNo progress to edit.")
                 return            
-            category = Validation.get_a_key(progress, "Category")
-            if not category:
+            subject = Validation.get_a_key(progress, "Subject")
+            if not subject:
                 if validate_choice("\nBack to Main Menu? ", ["Y", "N"]) == "Y":
                     return
-            book_title = "Para" if category in ["Al-Qur'an (Manzil)", "Al-Qur'an (Tafseer)"] else "Book"
-            book_name = Validation.get_a_key(progress[category], book_title)
+            book_title = "Para" if subject in ["Al-Qur'an (Tilawat)", "Al-Qur'an (Tafseer)"] else "Book"
+            book_name = Validation.get_a_key(progress[subject], book_title)
             if not book_name:
                 continue                
-            session = Validation.get_a_key(progress[category][book_name], "Session")
+            session = Validation.get_a_key(progress[subject][book_name], "Session")
             if not session:
                 continue                
-            dict_to_edit = progress[category][book_name][session]
-            if category == "Al-Qur'an (Tafseer)":
+            dict_to_edit = progress[subject][book_name][session]
+            if subject == "Al-Qur'an (Tafseer)":
                 entry_instance = TafseerEntry.from_dict(book_name, dict_to_edit)
-            elif category == "Al-Qur'an (Manzil)":
-                entry_instance = ManzilEntry.from_dict(book_name, dict_to_edit)
+            elif subject == "Al-Qur'an (Tilawat)":
+                entry_instance = TilawatEntry.from_dict(book_name, dict_to_edit)
             else:
                 entry_instance = OtherEntry.from_dict(book_name, dict_to_edit)
             title = f"{book_name} ( {session} )"
@@ -153,18 +153,18 @@ class ProgressEditor:
                 1, 2)
             if next_choice == 1:
                 editable_entries = [e for e in dict_to_edit if e not in ["Book", "Total Pages", "Total Aayat", "Total Ruku"]]
-                cls.edit_category(session, editable_entries, entry_instance)
-                progress[category][book_name][session] = entry_instance.to_dict()
+                cls.edit_subject(session, editable_entries, entry_instance)
+                progress[subject][book_name][session] = entry_instance.to_dict()
             else:
                 if validate_choice(
                     f"\nAre you sure you want to delete all entries for {title}?",
                     ["Y", "N"]) == "Y":
                     if session:
-                        progress[category][book_name].pop(session)
-                        cls.pop_empty_dicts(progress, category, book_name)
+                        progress[subject][book_name].pop(session)
+                        cls.pop_empty_dicts(progress, subject, book_name)
                     else:
-                        progress[category].pop(book_name)
-                        cls.pop_empty_dicts(progress, category)
+                        progress[subject].pop(book_name)
+                        cls.pop_empty_dicts(progress, subject)
                     StatsManager.clear_cache()
 
     @staticmethod
@@ -204,8 +204,8 @@ class ProgressDisplay:
         if not progress:
             print(f">>> No entries recorded for {day}.")
             return
-        for category, books in progress.items():
-            print(f"\n-----[<<( {category} )>>]-----\n")
+        for subject, books in progress.items():
+            print(f"\n-----[<<( {subject} )>>]-----\n")
             for book, sessions in books.items():
                 print(f"\n<><><>------[ {book} ]------<><><>\n")
                 for session, session_details in sessions.items():

@@ -58,14 +58,16 @@ class Menus:
 
     @classmethod
     def main_menu(cls) -> None:
-        print("\n<><><>__( Learning Journal )__<><><>\n")
+        print("\n<><><>__( Muslim Learning Journal )__<><><>\n")
         data = DataManager()
+        StatsManager.get_weekly_report(data)
+
         MENU_ITEMS = [
-            "Al-Qur'an (Tafseer)", "Al-Qur'an (Manzil)", "Other Categories",
-            "Save Changes", "View Entries", "Edit Entries", "Delete Entries"
+            "Al-Qur'an (Tafseer)", "Al-Qur'an (Tilawat)", "Log Other Subjects",
+            "Save Progress", "View Entries", "Edit Entries", "Delete Entries"
         ]
         main_menu = Menu(MENU_ITEMS)
-        StatsManager.get_weekly_report(data)
+        
         while True:
             user_choice, exit_option = main_menu.display_menu() # type: ignore
             if user_choice == exit_option:
@@ -74,9 +76,9 @@ class Menus:
             elif user_choice == 1:
                 ProgressLogger.Quran.log_Quran_progress(data)
             elif user_choice == 2:
-                ProgressLogger.Quran.log_Quran_progress(data, "Manzil")
+                ProgressLogger.Quran.log_Quran_progress(data, "Tilawat")
             elif user_choice == 3:
-                ProgressLogger.OtherCategories.log_other_progress(data)
+                ProgressLogger.OtherSubjects.log_other_progress(data)
             elif user_choice == 4:
                 data.save_progress_to_files()
             elif user_choice == 5:

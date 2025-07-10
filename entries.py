@@ -77,7 +77,7 @@ class CommonEntry:
 
 
 @dataclass
-class ManzilEntry(CommonEntry):
+class TilawatEntry(CommonEntry):
     Ruku: str
     total_Ruku: int
 
@@ -105,7 +105,7 @@ class ManzilEntry(CommonEntry):
         return super().from_dict(book, data, (data.get("Ruku (Para)", "0"), data.get("Total Ruku", 0)) + child_entries)
         
 @dataclass
-class TafseerEntry(ManzilEntry):
+class TafseerEntry(TilawatEntry):
     Surah_number: str
     Ayah: str
     total_Aayat: int

@@ -13,7 +13,7 @@ class FileManager:
     @staticmethod
     def save_entries_as_md(dict_entries: dict, file_path_md: str) -> None:
         """
-        Save learning entries to a Markdown file with formatted sections for Qur'an and other categories.
+        Save learning entries to a Markdown file with formatted sections for Qur'an and other subjects.
 
         Args:
             dict_entries (dict): Dictionary containing learning entries data
@@ -26,8 +26,8 @@ class FileManager:
                 else:
                     for date, record in dict_entries.items():
                         file.write(f"# {date}\n\n")
-                        for category, books in record.items():
-                            file.write(f"## {category}\n\n")
+                        for subject, books in record.items():
+                            file.write(f"## {subject}\n\n")
                             for book_name, sessions in books.items():                                    
                                 file.write(f"### {book_name}\n")
                                 for session, session_details in sessions.items():
@@ -63,10 +63,10 @@ class DataManager:
     def FILE_MD(self) -> str:
         return self.__FILE_JSON.replace(".json", ".md")
 
-    def append_entry(self, category: str, book_name: str, entry_dict: dict) -> None:
-        self.progress_today.setdefault(category, {}).setdefault(book_name, {})
+    def append_entry(self, subject: str, book_name: str, entry_dict: dict) -> None:
+        self.progress_today.setdefault(subject, {}).setdefault(book_name, {})
         entry = f"Entry {DateManager.get_current_time()}"
-        self.progress_today[category][book_name][entry] = entry_dict       
+        self.progress_today[subject][book_name][entry] = entry_dict       
         self.update_dict_main("", {})
 
     def update_dict_main(self, date: str, entries: dict) -> None:
