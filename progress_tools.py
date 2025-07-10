@@ -49,7 +49,7 @@ class ProgressLogger:
                 categories_menu = Menu(categories_list, "Select a Category")
                 user_choice = categories_menu.display_menu(show_exit=False)
                 if user_choice != 1:
-                    category = categories_list[user_choice - 1]
+                    category = categories_list[user_choice - 1] # type: ignore
                     return category, StatsManager.get_all_time_categories(
                     )[category]
             while True:
@@ -66,7 +66,7 @@ class ProgressLogger:
                 books_menu = Menu(books_menu_list, "Select a book")
                 user_choice = books_menu.display_menu(show_exit=False)
                 if user_choice != 1:
-                    return books_menu_list[user_choice - 1]
+                    return books_menu_list[user_choice - 1] # type: ignore
             while True:
                 book = input(
                     f"Enter the {category} book or material title: ").strip()
@@ -114,7 +114,7 @@ class ProgressEditor:
     def edit_category(cls, category: str, editable_entries: list, entry_instance):
         entries_menu = Menu(editable_entries, category)
         while True:
-            user_choice, exit_option = entries_menu.display_menu()
+            user_choice, exit_option = entries_menu.display_menu() # type: ignore
             if user_choice == exit_option:
                 return
             field = editable_entries[user_choice - 1]

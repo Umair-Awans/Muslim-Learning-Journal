@@ -68,7 +68,7 @@ class StatsManager:
             else:
                 last_month_num = num_month - 1
             month, last_month_days = DateManager.get_month_and_days(
-                last_month_num)
+                last_month_num, year)
             num_day = (last_month_days + num_day) - 7
         else:
             num_day -= 7
@@ -77,8 +77,8 @@ class StatsManager:
             num_day += 1
             if last_month_days and num_day == last_month_days:
                 num_day = 1
-                month, _ = DateManager.get_month_and_days(num_month)
-                year = year + 1 if last_month_num == 12 else year
+                year = year + 1 if last_month_num == 12 else year # type: ignore
+                month, _ = DateManager.get_month_and_days(num_month, year)
             if log_date in data.dict_main:
                 for category, dict_category in data.dict_main[log_date].items():
                     time_spent = cls.extract_time_spent(category, dict_category)
@@ -95,7 +95,7 @@ class StatsManager:
                 else:
                     entry = OtherEntry.from_dict(book, session_entry)
                 time_spent = entry.time_spent
-        return time_spent    
+        return time_spent # type: ignore
 
     @classmethod
     def convert_time_to_mins(cls, total_minutes, time_spent) -> int:

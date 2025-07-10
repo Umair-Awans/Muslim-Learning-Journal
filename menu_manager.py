@@ -67,7 +67,7 @@ class Menus:
         main_menu = Menu(MENU_ITEMS)
         StatsManager.get_weekly_report(data)
         while True:
-            user_choice, exit_option = main_menu.display_menu()
+            user_choice, exit_option = main_menu.display_menu() # type: ignore
             if user_choice == exit_option:
                 if cls.exit_program(data):
                     return

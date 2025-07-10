@@ -258,22 +258,27 @@ class PasswordManager:
 
 class DateManager:
     @staticmethod
-    def get_day_today():
+    def get_day_today() -> str:
         return datetime.today().strftime("%A")
 
     @staticmethod
-    def get_date_today():
+    def get_date_today() -> str:
         return datetime.today().strftime("%d-%b-%Y")
 
     @staticmethod
-    def get_current_time():
+    def get_current_time() -> str:
         return datetime.now().strftime("%I:%M:%S %p")
 
     @staticmethod
-    def get_month_and_days(number: int) -> tuple:
+    def is_leap_year(year: int) -> bool:
+        """Return True if the given year is a leap year, else False."""
+        return (year % 4 == 0 and year % 100 != 0) or year % 400 == 0 
+
+    @classmethod
+    def get_month_and_days(cls, number: int, year: int) -> tuple:        
         months_days_map = {
             "Jan": 31,
-            "Feb": 29,
+            "Feb": 28 if not cls.is_leap_year(year) else 29,
             "Mar": 31,
             "Apr": 30,
             "May": 31,
@@ -291,13 +296,13 @@ class DateManager:
 
     @classmethod
     def get_date_from_user(cls) -> str:
-        year = validate_number("\nPlease enter the year: ",
+        year = int(validate_number("\nPlease enter the year: ",
                                2023,
                                2025,
-                               exact_length=4)
+                               exact_length=4))
         month_number = int(
             validate_number("\nPlease enter the month (1-12): ", 1, 12))
-        month, max_days = cls.get_month_and_days(month_number)
+        month, max_days = cls.get_month_and_days(month_number, year)
         day = int(validate_number("\nPlease enter the day: ", 1, max_days))
         day = day if day > 9 else f"0{day}"
         return f"{day}-{month}-{year}"
@@ -353,7 +358,7 @@ class Validation:
                 return ""
             keys = sorted(list(progress.keys()))
             keys_menu = Menu(keys, f"Select a {key}")
-            user_choice, exit_option = keys_menu.display_menu(exit_label="Go Back")
+            user_choice, exit_option = keys_menu.display_menu(exit_label="Go Back") # type: ignore
             if user_choice == exit_option:
                 return ""
             return keys[user_choice - 1]
