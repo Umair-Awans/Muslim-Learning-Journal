@@ -44,10 +44,10 @@ class FileManager:
             )
 
     @staticmethod
-    def save_to_json(dict_entries: dict, file_path_json: str) -> None:
+    def save_to_json(dict_: dict, file_path_json: str) -> None:
         try:
             with open(file_path_json, 'w') as file:
-                json.dump(dict_entries, file, indent=4)
+                json.dump(dict_, file, indent=4)
                 print("\nProgress saved successfully!")
         except IOError as e:
             print(f"\nError: {e}")
@@ -57,7 +57,17 @@ class DataManager:
     def __init__(self) -> None:
         self.__FILE_JSON = './data/Learning_Journal.json'
         self.dict_main = FileManager.load_file(self.__FILE_JSON)
+        self.all_time_subjects = {}
+        self.stats = {}
         self.progress_today = self.dict_main.get(DateManager.get_date_today(), {})
+
+    @property
+    def file_dict(self) -> dict:
+        return {
+                    "All Time Subjects": self.all_time_subjects,
+                    "Entry Log": self.dict_main,
+                    "Statistics": self.stats
+                }
 
     @property
     def FILE_MD(self) -> str:
@@ -84,6 +94,6 @@ class DataManager:
             self.dict_main.pop(day)
 
     def save_progress_to_files(self):
-        FileManager.save_to_json(self.dict_main, self.__FILE_JSON)
+        FileManager.save_to_json(self.file_dict, self.__FILE_JSON)
         FileManager.save_entries_as_md(self.dict_main, self.FILE_MD)
 

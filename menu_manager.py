@@ -61,6 +61,7 @@ class Menus:
         print("\n<><><>__( Muslim Learning Journal )__<><><>\n")
         data = DataManager()
         StatsManager.get_weekly_report(data)
+        StatsManager.temporary_backfill(data)
 
         MENU_ITEMS = [
             "Al-Qur'an (Tafseer)", "Al-Qur'an (Tilawat)", "Log Other Subjects",

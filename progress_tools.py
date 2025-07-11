@@ -77,12 +77,12 @@ class ProgressLogger:
         @classmethod
         def get_and_add_progress(cls, data: DataManager) -> None:
             StatsManager.build_subjects_cache(data)
-            subject, books_list = cls.get_subject_books()
-            print(f"\n<><><>__(<<[ {subject} ]>>)__<><><>\n")
-            book_name = cls.get_book_name(subject, books_list)
-            print(f"\n<><><>__(<< {book_name} >>)__<><><>\n")
-            entry = OtherEntry.from_user_input(book_name)
-            data.append_entry(subject, book_name, entry.to_dict())
+            # subject, books_list = cls.get_subject_books()
+            # print(f"\n<><><>__(<<[ {subject} ]>>)__<><><>\n")
+            # book_name = cls.get_book_name(subject, books_list)
+            # print(f"\n<><><>__(<< {book_name} >>)__<><><>\n")
+            # entry = OtherEntry.from_user_input(book_name)
+            # data.append_entry(subject, book_name, entry.to_dict())
 
         @classmethod
         def log_other_progress(cls, data: DataManager) -> None:
