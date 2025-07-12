@@ -309,16 +309,43 @@ class DateManager:
 
 
 
+class Utilities:
+    @staticmethod
+    def pop_empty_dicts(dict_: dict, dict1: str, dict2: str):
+        if not dict_[dict1][dict2]:
+            dict_[dict1].pop(dict2)
+            if not dict_[dict1]:
+                dict_.pop(dict1)
+
+    @staticmethod
+    def format_time(total_minutes: int) -> str:
+        hours = f"{total_minutes//60} hr(s)" if total_minutes // 60 > 0 else ""
+        minutes = f"{total_minutes%60} min(s)" if total_minutes % 60 > 0 else ""
+        total_time = (hours + " " + minutes).strip()
+        return total_time if total_time else "0 min(s)"
+    
+    @classmethod
+    def convert_time_to_mins(cls, time_spent) -> int:
+        total_minutes = 0
+        if "hr(s)" in time_spent:
+            hours = int(time_spent.split("hr(s)")[0].strip())
+            total_minutes += (hours * 60)
+        if "min(s)" in time_spent:
+            mins = time_spent.split("min(s)")[0].strip()
+            if "hr(s)" in mins:
+                mins = mins.split("hr(s)")[1].strip()
+            mins = int(mins)
+            total_minutes += mins
+        return total_minutes
+
+
 class Validation:
 
     @staticmethod
     def get_time_spent(book: str):
         mins_spent = validate_number(
             f"\nEnter the time spent on {book} in this session (in minutes): ")
-        hours = f"{mins_spent//60} hr(s) " if (mins_spent // 60) > 0 else ""
-        minutes = f"{mins_spent%60} min(s)" if (mins_spent % 60) > 0 else ""
-        return (hours + " " +
-                minutes).strip() if hours or minutes else "0 min(s)"
+        return Utilities.format_time(int(mins_spent))
 
     @staticmethod
     def get_revision() -> str:

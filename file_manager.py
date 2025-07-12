@@ -1,5 +1,5 @@
 import json
-from core_utils import DateManager
+from core_utils import DateManager, Utilities
 
 class FileManager:
     @staticmethod
@@ -55,45 +55,92 @@ class FileManager:
 
 class DataManager:
     def __init__(self) -> None:
-        self.__FILE_JSON = './data/Learning_Journal.json'
-        self.dict_main = FileManager.load_file(self.__FILE_JSON)
-        self.all_time_subjects = {}
-        self.stats = {}
-        self.progress_today = self.dict_main.get(DateManager.get_date_today(), {})
+        self.__FILE_JSON = './data/learning_data.json'
+        self.date_today = DateManager.get_date_today()
+        self.data = FileManager.load_file(self.__FILE_JSON)
+        self.entry_log = self.data.get("Entry Log", {})
+        self.all_time_subjects = self.data.get("All Time Subjects", {})
+        self.stats = self.data.get("Statistics", {})
+        self.progress_today = self.entry_log.get(self.date_today, {})
+
+    @property
+    def FILE_MD(self) -> str:
+        return "./data/Journal.md"
 
     @property
     def file_dict(self) -> dict:
         return {
+                    "Entry Log": self.entry_log,
                     "All Time Subjects": self.all_time_subjects,
-                    "Entry Log": self.dict_main,
                     "Statistics": self.stats
                 }
-
-    @property
-    def FILE_MD(self) -> str:
-        return self.__FILE_JSON.replace(".json", ".md")
 
     def append_entry(self, subject: str, book_name: str, entry_dict: dict) -> None:
         self.progress_today.setdefault(subject, {}).setdefault(book_name, {})
         entry = f"Entry {DateManager.get_current_time()}"
-        self.progress_today[subject][book_name][entry] = entry_dict       
-        self.update_dict_main("", {})
+        self.progress_today[subject][book_name][entry] = entry_dict
+        self.add_to_cache(subject, book_name)
+        self.add_stats(subject, book_name, entry_dict)
+        self.update_entry_log("", {})
 
-    def update_dict_main(self, date: str, entries: dict) -> None:
+    def add_to_cache(self, subject, book_name):
+        if subject not in ["Al-Qur'an (Tafseer)", "Al-Qur'an (Tilawat)"]:
+            self.all_time_subjects.setdefault(subject, [])
+            self.all_time_subjects = dict(sorted(self.all_time_subjects.items(), key=lambda item: item[0].lower()))
+            if book_name not in self.all_time_subjects[subject]:
+                self.all_time_subjects[subject].append(book_name)
+                self.all_time_subjects[subject].sort()
+
+    def add_stats(self, subject, book_name, entry_dict: dict):
+        self.stats.setdefault(subject, {}).setdefault(book_name, {})
+        self.stats = dict(sorted(self.stats.items(), key=lambda item: item[0].lower()))
+        self.stats[subject] = dict(sorted(self.stats[subject].items(), key=lambda item: item[0].lower()))
+        self.stats[subject][book_name].setdefault("Pages", 0)
+        self.stats[subject][book_name].setdefault("Time Spent", "")
+        self.stats[subject][book_name].setdefault("Entry Dates", [])
+
+        self.stats[subject][book_name]["Pages"] += entry_dict["Total Pages"]
+
+        all_time_minutes = Utilities.convert_time_to_mins(self.stats[subject][book_name]["Time Spent"])
+        entry_minutes = Utilities.convert_time_to_mins(entry_dict["Time Spent"])
+        self.stats[subject][book_name]["Time Spent"] = Utilities.format_time(all_time_minutes + entry_minutes)
+
+        if self.date_today not in self.stats[subject][book_name]["Entry Dates"]:
+            self.stats[subject][book_name]["Entry Dates"].append(self.date_today)
+
+    def update_cache(self, cache: dict) -> None:
+        self.all_time_subjects = cache
+        
+    def update_stats(self, stats: dict) -> None:
+        self.stats = stats
+
+    def update_entry_log(self, date: str, entries: dict) -> None:
         date = date or DateManager.get_date_today()
         entries = entries or self.progress_today
         if entries:
-            self.dict_main[date] = entries
-        elif date in self.dict_main and not self.dict_main[date]:
-            self.dict_main.pop(date)
+            self.entry_log[date] = entries
+        elif date in self.entry_log and not self.entry_log[date]:
+            self.entry_log.pop(date)
 
+    def delete_stats(self, day: str):
+        from progress_tools import ProgressEditor
+        for subject, subject_entries in self.entry_log[day].items():
+            for book, book_entries in subject_entries.items():
+                if day in self.stats[subject][book]["Entry Dates"]:
+                    self.stats[subject][book]["Entry Dates"].remove(day)
+                    for entry_details in book_entries.values():
+                        ProgressEditor.update_entry_pages((subject, book), entry_details["Total Pages"], self.stats)
+                        ProgressEditor.update_entry_minutes((subject, book), entry_details["Time Spent"], self.stats)
+                    
     def delete_progress(self, day: str):
         if day == "ALL_TIME":
-            self.dict_main.clear()
-        elif day in self.dict_main:
-            self.dict_main.pop(day)
+            self.entry_log.clear()
+            self.stats.clear()
+        elif day in self.entry_log:
+            self.delete_stats(day)
+            self.entry_log.pop(day)
 
     def save_progress_to_files(self):
         FileManager.save_to_json(self.file_dict, self.__FILE_JSON)
-        FileManager.save_entries_as_md(self.dict_main, self.FILE_MD)
+        FileManager.save_entries_as_md(self.entry_log, self.FILE_MD)
 

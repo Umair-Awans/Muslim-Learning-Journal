@@ -1,5 +1,5 @@
 from copy import deepcopy
-from core_utils import (validate_choice, validate_number, DateManager, Menu)
+from core_utils import (validate_choice, validate_number, DateManager, Menu, PasswordManager)
 from file_manager import DataManager
 from progress_tools import ProgressEditor, ProgressDisplay, ProgressLogger
 from stats_manager import StatsManager
@@ -16,10 +16,10 @@ class Menus:
         else:
             print("\nEnter the date you wish to edit entries for:")
             date = DateManager.get_date_from_user()
-        if date in data.dict_main:
-            progress_copy = deepcopy(data.dict_main[date])
-            ProgressEditor.edit_progress(progress_copy)
-            data.update_dict_main(date, progress_copy)
+        if date in data.entry_log:
+            progress_copy = deepcopy(data.entry_log[date])
+            ProgressEditor.edit_progress(progress_copy, data, date)
+            data.update_entry_log(date, progress_copy)
         else:
             print(
                 f"No entries found for {'today' if date_opt == 1 else date}.")
@@ -35,12 +35,40 @@ class Menus:
         else:
             print("\nEnter the date you wish to view entries for:")
             date = DateManager.get_date_from_user()
-        if date in data.dict_main:
-            ProgressDisplay.display_entries_all(data.dict_main[date], date)
+        if date in data.entry_log:
+            ProgressDisplay.display_entries_all(data.entry_log[date], date)
         else:
             print(
                 f"No entries found for {'today' if date_opt == 1 else date}. Please try another date."
             )
+    
+    @staticmethod
+    def delete_progress_menu(data: DataManager) -> None:
+        del_menu_options = [
+            "Delete today's entries", "Delete entries from another day", "Delete all recorded entries"
+        ]
+        what_to_del = validate_number(
+            f"\nDelete Options:\n\n1. {del_menu_options[0]}\n2. {del_menu_options[1]}\n3. {del_menu_options[2]}\n\nYour choice: ",
+            1, 3)
+        confirm_del = validate_choice(
+            f"\nAre you sure you want to {del_menu_options[int(what_to_del) - 1].lower()}?",
+            ["Y", "N"])
+        if confirm_del == "Y":
+            if what_to_del == 1:
+                date = DateManager.get_date_today()
+                data.delete_progress(date)
+                print(f"\nAll entries from today ({date}) deleted successfully!")
+            elif what_to_del == 2:
+                date = DateManager.get_date_from_user()
+                data.delete_progress(date)
+                print(f"\nAll entries from {date} deleted successfully!")
+            else:
+                password = input("\nEnter Your Password: ")
+                if PasswordManager.verify_password(password):
+                    data.delete_progress("ALL_TIME")
+                    print("\nAll data deleted successfully!")
+                else:
+                    print("\nWRONG PASSWORD!")
 
     @staticmethod
     def exit_program(data: DataManager) -> bool:
@@ -61,7 +89,6 @@ class Menus:
         print("\n<><><>__( Muslim Learning Journal )__<><><>\n")
         data = DataManager()
         StatsManager.get_weekly_report(data)
-        StatsManager.temporary_backfill(data)
 
         MENU_ITEMS = [
             "Al-Qur'an (Tafseer)", "Al-Qur'an (Tilawat)", "Log Other Subjects",
@@ -87,4 +114,4 @@ class Menus:
             elif user_choice == 6:
                 cls.edit_progress_menu(data)
             elif user_choice == 7:
-                ProgressEditor.delete_progress(data)
+                cls.delete_progress_menu(data)

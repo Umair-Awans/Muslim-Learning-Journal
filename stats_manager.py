@@ -1,59 +1,10 @@
 from datetime import datetime
 from entries import TafseerEntry, TilawatEntry, OtherEntry
 from file_manager import DataManager
-from core_utils import DateManager
+from core_utils import DateManager, Utilities
 
 
-class StatsManager:
-    __all_time_subjects = {}
-
-    @classmethod
-    def get_all_time_subjects(cls) -> dict:
-        return cls.__all_time_subjects
-
-    @classmethod
-    def clear_cache(cls) -> None:
-        cls.__all_time_subjects.clear()
-
-    @classmethod
-    def build_subjects_cache(cls, data: DataManager) -> None:
-        if not data.all_time_subjects:
-            for dict_ in data.dict_main.values():
-                cls.extract_subjects(dict_, data)
-            cls.extract_subjects(data.progress_today, data)
-        else:
-            cls.extract_subjects(data.progress_today, data)
-
-    @classmethod
-    def extract_subjects(cls, dict_: dict, data: DataManager) -> None:
-        for subject, subject_data in dict_.items():
-            if subject in ["Al-Qur'an (Tilawat)", "Al-Qur'an (Tafseer)"]:
-                continue
-            data.all_time_subjects.setdefault(subject, [])
-            for book in subject_data:
-                if book not in data.all_time_subjects[subject]:
-                    data.all_time_subjects[subject].append(book)
-            data.all_time_subjects[subject].sort()
-
-    @staticmethod
-    def format_time(total_minutes: int) -> str:
-        hours = f"{total_minutes//60} hr(s)" if total_minutes // 60 > 0 else ""
-        minutes = f"{total_minutes%60} min(s)" if total_minutes % 60 > 0 else ""
-        total_time = (hours + " " + minutes).strip()
-        return total_time if total_time else "0 min(s)"
-    
-    @classmethod
-    def convert_time_to_mins(cls, total_minutes, time_spent) -> int:
-        if "hr(s)" in time_spent:
-            hours = int(time_spent.split("hr(s)")[0].strip())
-            total_minutes += (hours * 60)
-        if "min(s)" in time_spent:
-            mins = time_spent.split("min(s)")[0].strip()
-            if "hr(s)" in mins:
-                mins = mins.split("hr(s)")[1].strip()
-            mins = int(mins)
-            total_minutes += mins
-        return total_minutes
+class StatsManager:  
 
     @classmethod
     def display_stats(cls,
@@ -61,7 +12,7 @@ class StatsManager:
                       title: str = "Weekly Report",
                       duration: str = "week"):
         print(f"\n-------------( {title} )-------------\n")
-        total_time = cls.format_time(total_minutes)
+        total_time = Utilities.format_time(total_minutes)
         prompts = [
             f"\nYou spent a total of {total_time} on learning activities over the past {duration}.\n",
             f"\nNo learning activity was recorded for this {duration}.\n"
@@ -102,32 +53,49 @@ class StatsManager:
     def get_weekly_report(cls, data: DataManager):
         total_minutes = 0
         for date in cls.get_last_seven_days():
-            if date in data.dict_main:
-                for subject, dict_subject in data.dict_main[date].items():
-                    time_spent = cls.extract_time_spent(subject, dict_subject)
-                    total_minutes = cls.convert_time_to_mins(
-                        total_minutes, time_spent)
+            if date in data.entry_log:
+                for subject, dict_subject in data.entry_log[date].items():
+                    for book, book_entry in dict_subject.items():
+                        for _, session_entry in book_entry.items():
+                            time_spent = cls.extract_time_spent(subject, book, session_entry)
+                            total_minutes += Utilities.convert_time_to_mins(time_spent)
         cls.display_stats(total_minutes)
 
     @classmethod
-    def extract_time_spent(cls, subject, dict_subject):
+    def extract_time_spent(cls, subject, book, session_entry):
         map_dict = {
             "Al-Qur'an (Tafseer)": TafseerEntry.from_dict,
             "Al-Qur'an (Tilawat)": TilawatEntry.from_dict
         }
-        for book, book_entry in dict_subject.items():
-            for session, session_entry in book_entry.items():
-                if subject in map_dict:
-                    entry = map_dict[subject](subject, session_entry)
-                else:
-                    entry = OtherEntry.from_dict(book, session_entry)
-                time_spent = entry.time_spent
-        return time_spent  # type: ignore
+        if subject in map_dict:
+            entry = map_dict[subject](subject, session_entry)
+        else:
+            entry = OtherEntry.from_dict(book, session_entry)
+        return entry.time_spent
 
     @classmethod
-    def temporary_backfill(cls, data: DataManager):
+    def build_subjects_cache(cls, data: DataManager) -> None:
+        all_time_subjects = {}
+        for dict_ in data.entry_log.values():
+            cls.extract_subjects(dict_, all_time_subjects)
+        cls.extract_subjects(data.progress_today, all_time_subjects)
+        data.update_cache(all_time_subjects)
+
+    @classmethod
+    def extract_subjects(cls, dict_: dict, all_time_subjects: dict) -> None:
+        for subject, subject_data in dict_.items():
+            if subject in ["Al-Qur'an (Tilawat)", "Al-Qur'an (Tafseer)"]:
+                continue
+            all_time_subjects.setdefault(subject, [])
+            for book in subject_data:
+                if book not in all_time_subjects[subject]:
+                    all_time_subjects[subject].append(book)
+            all_time_subjects[subject].sort()
+
+    @classmethod
+    def calculate_stats(cls, data: DataManager):
         all_time = {}
-        for date, progress_date in data.dict_main.items():
+        for date, progress_date in data.entry_log.items():
             for subject, progress_subject in progress_date.items():
                 all_time.setdefault(subject, {})
                 for book, progress_book in progress_subject.items():
@@ -137,18 +105,17 @@ class StatsManager:
                     all_time[subject][book].setdefault("Time Spent", "")
                     all_time[subject][book].setdefault("Entry Dates", [])
                     all_time[subject][book]["Entry Dates"].append(date)
-                    for entry, progress_entry in progress_book.items():
-                        all_time[subject][book]["Minutes"] = cls.convert_time_to_mins(
-                            all_time[subject][book]["Minutes"], progress_entry["Time Spent"])
+                    for _, progress_entry in progress_book.items():
+                        all_time[subject][book]["Minutes"] += Utilities.convert_time_to_mins(progress_entry["Time Spent"])
                         all_time[subject][book]["Pages"] += progress_entry["Total Pages"]
         all_time = dict(sorted(all_time.items()))
         for subject, dict_subject in all_time.items():
             temp = sorted((dict_subject.items()), key=lambda x: cls.extract_sort_key(x[0]))
             all_time[subject] = dict(temp)
             for book, dict_book in all_time[subject].items():
-                dict_book["Time Spent"] = cls.format_time(dict_book["Minutes"])
+                dict_book["Time Spent"] = Utilities.format_time(dict_book["Minutes"])
                 dict_book.pop("Minutes")
-        data.stats = all_time
+        data.update_stats(all_time)
 
     @staticmethod
     def extract_sort_key(book_title: str):
