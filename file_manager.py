@@ -55,17 +55,20 @@ class FileManager:
 
 class DataManager:
     def __init__(self) -> None:
-        self.__FILE_JSON = './data/learning_data.json'
-        self.date_today = DateManager.get_date_today()
+        self.__FILE_JSON = "./data/learning_data.json"
+        self.FILE_MD = "./data/Journal.md"
         self.data = FileManager.load_file(self.__FILE_JSON)
         self.entry_log = self.data.get("Entry Log", {})
         self.all_time_subjects = self.data.get("All Time Subjects", {})
         self.stats = self.data.get("Statistics", {})
-        self.progress_today = self.entry_log.get(self.date_today, {})
+        self.sync_data_today()
 
-    @property
-    def FILE_MD(self) -> str:
-        return "./data/Journal.md"
+    def update_date_today(self):
+        self.date_today = DateManager.get_date_today()
+
+    def sync_data_today(self):
+        self.update_date_today()
+        self.progress_today = self.entry_log.get(self.date_today, {})
 
     @property
     def file_dict(self) -> dict:
@@ -76,8 +79,9 @@ class DataManager:
                 }
 
     def append_entry(self, subject: str, book_name: str, entry_dict: dict) -> None:
-        self.progress_today.setdefault(subject, {}).setdefault(book_name, {})
+        self.sync_data_today()
         entry = f"Entry {DateManager.get_current_time()}"
+        self.progress_today.setdefault(subject, {}).setdefault(book_name, {})
         self.progress_today[subject][book_name][entry] = entry_dict
         self.add_to_cache(subject, book_name)
         self.add_stats(subject, book_name, entry_dict)
@@ -93,6 +97,9 @@ class DataManager:
 
     def add_stats(self, subject, book_name, entry_dict: dict):
         self.stats.setdefault(subject, {}).setdefault(book_name, {})
+        if self.date_today not in self.stats[subject][book_name]["Entry Dates"]:
+            self.stats[subject][book_name]["Entry Dates"].append(self.date_today)
+
         self.stats = dict(sorted(self.stats.items(), key=lambda item: item[0].lower()))
         self.stats[subject] = dict(sorted(self.stats[subject].items(), key=lambda item: item[0].lower()))
         self.stats[subject][book_name].setdefault("Pages", 0)
@@ -105,8 +112,6 @@ class DataManager:
         entry_minutes = Utilities.convert_time_to_mins(entry_dict["Time Spent"])
         self.stats[subject][book_name]["Time Spent"] = Utilities.format_time(all_time_minutes + entry_minutes)
 
-        if self.date_today not in self.stats[subject][book_name]["Entry Dates"]:
-            self.stats[subject][book_name]["Entry Dates"].append(self.date_today)
 
     def update_cache(self, cache: dict) -> None:
         self.all_time_subjects = cache
@@ -115,7 +120,7 @@ class DataManager:
         self.stats = stats
 
     def update_entry_log(self, date: str, entries: dict) -> None:
-        date = date or DateManager.get_date_today()
+        date = date or self.date_today
         entries = entries or self.progress_today
         if entries:
             self.entry_log[date] = entries
