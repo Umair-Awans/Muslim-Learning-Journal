@@ -1,5 +1,5 @@
 import sys
-from PyQt5.QtGui import QIcon, QPainter, QLinearGradient, QColor
+from PyQt5.QtGui import QIcon, QPainter, QLinearGradient, QColor, QIntValidator
 from PyQt5.QtCore import Qt, QRect
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QTextEdit,
                              QGridLayout, QAction, QFileDialog, QLabel, QCheckBox,
@@ -8,6 +8,7 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QTextEdit,
 sys.path.append("../Modules")
 from MyQt5 import ClickableLabel
 from entries import TafseerEntry, OtherEntry
+
 
 class Utilities:
     @staticmethod
@@ -26,7 +27,7 @@ class Utilities:
             stop:1 {bottom_color});"""
 
     @classmethod            
-    def styleWidgets(cls, *widgets):
+    def styleWidgets(cls, *widgets, form_labels=False):
         for widget in widgets:
             FONT = 'Segoe Script' if not isinstance(widget, ClickableLabel) else 'Arial'
             FONT_SIZE = 35 if not isinstance(widget, ClickableLabel) else 25
@@ -58,14 +59,183 @@ class Utilities:
             widget.setStyleSheet(normal_style)
             if isinstance(widget, ClickableLabel):
                 widget.setPressedStyle(pressed_style)
+            if form_labels:
+                widget.setFixedWidth(550)
 
     @staticmethod
-    def styleInputFields(*widgets):
+    def styleInputFields(*widgets, form_inputs=False):
         for widget in widgets:
             widget.setStyleSheet("""QLineEdit{
                 font-size: 25px;
                 padding: 10px;
             }""")
+            if form_inputs:
+                widget.setFixedWidth(250)
+
+
+class EntryForm(QScrollArea):
+    def __init__(self):
+        super().__init__()
+        self.main_widget = QWidget()
+        self.main_layout = QVBoxLayout(self.main_widget)
+        self.setWidgetResizable(True)
+        self.setWidget(self.main_widget)
+
+        self.Page_label = QLabel("Page no.")
+        self.Page_input = QLineEdit()
+        self.Page_input.setValidator(QIntValidator(1, 9999))
+        self.Time_label = QLabel("Time Spent (in minutes):")
+        self.Time_input = QLineEdit()
+        self.Time_input.setValidator(QIntValidator(1, 9999))
+        self.Notes_label = QLabel("Notes (optional):")
+        self.Notes_input = QTextEdit()
+        self.Sequence_label = QLabel("Reading Sequentially?")
+        self.Sequence_input = QCheckBox()
+        self.Revision_label = QLabel("Revision Notes (optional):")
+        self.Revision_input = QTextEdit()
+        self.submit_label = ClickableLabel("Submit")
+        self.go_back_label = ClickableLabel("Go Back")
+
+        self.commons_widget = QWidget()
+        self.commons_layout = QGridLayout(self.commons_widget)        
+        self.commons_layout.addWidget(self.Page_label, 0, 0, 1, 1)
+        self.commons_layout.addWidget(self.Page_input, 0, 1, 1, 2)
+        self.commons_layout.addWidget(self.Time_label, 1, 0, 1, 1)
+        self.commons_layout.addWidget(self.Time_input, 1, 1, 1, 2)
+        self.commons_layout.addWidget(self.Notes_label, 2, 0, 1, 1)
+        self.commons_layout.addWidget(self.Notes_input, 2, 1, 1, 2)
+        self.commons_layout.addWidget(self.Sequence_label, 3, 0, 1, 2)
+        self.commons_layout.addWidget(self.Sequence_input, 3, 2, 1, 1)
+        self.commons_layout.addWidget(self.Revision_label, 4, 0, 1, 2)
+        self.commons_layout.addWidget(self.Revision_input, 4, 1, 1, 2)
+        self.commons_layout.addWidget(self.submit_label, 5, 0, 1, 3)
+        self.commons_layout.addWidget(self.go_back_label, 6, 0, 1, 3)
+
+        Utilities.styleWidgets(
+            self.Page_label,
+            self.Time_label,
+            self.Notes_label,
+            self.Sequence_label,
+            self.Revision_label, 
+            form_labels=True
+        )
+        Utilities.styleWidgets(self.submit_label, self.go_back_label)
+        Utilities.styleInputFields(
+            self.Page_input,
+            self.Time_input,
+            self.Notes_input,
+            self.Sequence_input,
+            self.Revision_input,
+            form_inputs=True
+        )
+    
+
+class QuranKareemForm(EntryForm):
+    def __init__(self, Tafseer=True):
+        super().__init__()
+        if Tafseer:
+            self.Surah_label = QLabel("Surah no.")
+            self.Surah_input = QLineEdit()
+            self.Surah_input.setValidator(QIntValidator(1, 114))
+            self.Ayah_label = QLabel("Ayah no.")
+            self.Ayah_input = QLineEdit()
+            self.Ayah_input.setValidator(QIntValidator(1, 9999))
+        self.Para_label = QLabel("Para no.")
+        self.Para_input = QLineEdit()
+        self.Para_input.setValidator(QIntValidator(1, 30))
+        self.Ruku_label = QLabel("Ruku no.")
+        self.Ruku_input = QLineEdit()
+        self.Ruku_input.setValidator(QIntValidator(1, 9999))
+        self.form_widget = QWidget()
+        self.form_layout = QGridLayout(self.form_widget)
+
+        if Tafseer:
+            Utilities.styleWidgets(
+                self.Para_label,
+                self.Surah_label,
+                self.Ayah_label,
+                self.Ruku_label,
+                form_labels=True
+            )
+            Utilities.styleInputFields(
+                self.Para_input,
+                self.Surah_input,
+                self.Ayah_input,
+                self.Ruku_input,
+                form_inputs=True
+            )
+        else:            
+            Utilities.styleWidgets(self.Para_label, self.Ruku_label, form_labels=True)
+            Utilities.styleInputFields(self.Para_input, self.Ruku_input, form_inputs=True)
+
+        if Tafseer:
+            self.add_to_layout(self.Para_label, self.Para_input, self.Surah_label, self.Surah_input, self.Ayah_label, self.Ayah_input, self.Ruku_label, self.Ruku_input)
+        else:
+            self.add_to_layout(self.Para_label, self.Para_input, self.Ruku_label, self.Ruku_input)
+
+        self.main_layout.addWidget(self.form_widget)
+        self.main_layout.addWidget(self.commons_widget)
+
+
+    def add_to_layout(self, *widgets):
+        row = 0
+        x = 0
+        col = 0
+        col_span = 1
+        for widget in widgets:
+            self.form_layout.addWidget(widget, row, col, 1, col_span)
+            x += 0.5
+            row = int(x)
+            col = 0 if col == 1 else 1
+            col_span = 2 if col_span == 1 else 1
+
+    def submit_form(self):
+        # dummy function
+        TafseerEntry(
+            self.Para_input.text(),
+            self.Surah_input.text(),
+            int(self.Ayah_input.text()),
+            self.Ruku_input.text(),
+            self.Page_input.text(),
+            self.Time_input.text(),
+            self.Notes_input.text(),
+            self.Sequence_input.text(),
+            int(self.Revision_input.text()),
+            self.Revision_input.text(),
+            self.Revision_input.text(),
+            int(self.Revision_input.text()),
+            )
+
+class OtherSubjectsForm(EntryForm):
+    def __init__(self):
+        super().__init__()
+        self.form_widget = QWidget()
+        self.form_layout = QGridLayout(self.form_widget)
+        self.subject_label = QLabel("Subject:")
+        self.subject_input = QLineEdit()
+        self.book_label = QLabel("Book:")
+        self.book_input = QLineEdit()
+        self.unit_label = QLabel("Unit:")
+        self.unit_input = QLineEdit()
+        self.unit_input.setValidator(QIntValidator(1, 1000))
+        self.chapter_label = QLabel("Chapter:")
+        self.chapter_input = QLineEdit()
+
+        Utilities.styleWidgets(self.subject_label, self.book_label, self.unit_label, self.chapter_label, form_labels=True)
+        Utilities.styleInputFields(self.subject_input, self.book_input, self.unit_input, self.chapter_input, form_inputs=True)
+
+        self.form_layout.addWidget(self.subject_label, 0, 0, 1, 1)
+        self.form_layout.addWidget(self.subject_input, 0, 1, 1, 2)
+        self.form_layout.addWidget(self.book_label, 1, 0, 1, 1)
+        self.form_layout.addWidget(self.book_input, 1, 1, 1, 2)
+        self.form_layout.addWidget(self.unit_label, 2, 0, 1, 1)
+        self.form_layout.addWidget(self.unit_input, 2, 1, 1, 2)
+        self.form_layout.addWidget(self.chapter_label, 3, 0, 1, 1)
+        self.form_layout.addWidget(self.chapter_input, 3, 1, 1, 2)
+
+        self.main_layout.addWidget(self.form_widget)
+        self.main_layout.addWidget(self.commons_widget)       
+        
 
 
 class MainMenu(QWidget):
@@ -103,115 +273,16 @@ class MainMenu(QWidget):
         self.menu.addWidget(self.exit_label, 4, 0, 1, 3)
 
 
-class QuranKareemForm(QWidget):
-    def __init__(self, main_window):
-        super().__init__()
-        self.main_window = main_window
-        self.form_scroll = QScrollArea()
-        self.form_scroll.setWidgetResizable(True)
-        self.form_scroll.setWidget(self)
-        self.Para_label = QLabel("Para no.")
-        self.Para_input = QSpinBox()
-        self.Para_input.setRange(1, 30)
-        self.Surah_label = QLabel("Surah no.")
-        self.Surah_input = QSpinBox()
-        self.Surah_input.setRange(1, 114)
-        self.Ayah_label = QLabel("Ayah no.")
-        self.Ayah_input = QSpinBox()
-        self.Ayah_input.setRange(1, 99999)
-        self.Ruku_label = QLabel("Ruku no.")
-        self.Ruku_input = QSpinBox()
-        self.Ruku_input.setRange(1, 99999)
-        self.Page_label = QLabel("Page no.")
-        self.Page_input = QSpinBox()
-        self.Page_input.setRange(1, 99999)
-        self.Time_label = QLabel("Time Spent ( in minutes):")
-        self.Time_input = QSpinBox()
-        self.Time_input.setRange(1, 99999)
-        self.Notes_label = QLabel("Notes (optional):")
-        self.Notes_input = QTextEdit()
-        self.Sequence_label = QLabel("Reading Sequentially?")
-        self.Sequence_input = QCheckBox()
-        self.Revision_label = QLabel("Did you revise previous content?")
-        self.Revision_input = QTextEdit()
-        self.submit_label = ClickableLabel("Submit")
-        self.submit_label.leftClicked.connect(self.submit_form)
-        self.go_back_label = ClickableLabel("Go Back")
-
-        self.form_layout = QGridLayout(self)
-        self.form_layout.addWidget(self.Para_label, 0, 0, 1, 1)
-        self.form_layout.addWidget(self.Para_input, 0, 1, 1, 2)
-        self.form_layout.addWidget(self.Surah_label, 1, 0, 1, 1)
-        self.form_layout.addWidget(self.Surah_input, 1, 1, 1, 2)
-        self.form_layout.addWidget(self.Ayah_label, 2, 0, 1, 1)
-        self.form_layout.addWidget(self.Ayah_input, 2, 1, 1, 2)
-        self.form_layout.addWidget(self.Ruku_label, 3, 0, 1, 1)
-        self.form_layout.addWidget(self.Ruku_input, 3, 1, 1, 2)
-        self.form_layout.addWidget(self.Page_label, 4, 0, 1, 1)
-        self.form_layout.addWidget(self.Page_input, 4, 1, 1, 2)
-        self.form_layout.addWidget(self.Time_label, 5, 0, 1, 1)
-        self.form_layout.addWidget(self.Time_input, 5, 1, 1, 2)
-        self.form_layout.addWidget(self.Notes_label, 6, 0, 1, 1)
-        self.form_layout.addWidget(self.Notes_input, 6, 1, 1, 2)
-        self.form_layout.addWidget(self.Sequence_label, 7, 0, 1, 2)
-        self.form_layout.addWidget(self.Sequence_input, 7, 2, 1, 1)
-        self.form_layout.addWidget(self.Revision_label, 8, 0, 1, 2)
-        self.form_layout.addWidget(self.Revision_input, 8, 1, 1, 2)
-        self.form_layout.addWidget(self.submit_label, 9, 0, 1, 3)
-        self.form_layout.addWidget(self.go_back_label, 10, 0, 1, 3)
-
-        Utilities.styleWidgets(
-            self.Para_label,
-            self.Surah_label,
-            self.Ayah_label,
-            self.Ruku_label,
-            self.Page_label,
-            self.Time_label,
-            self.Notes_label,
-            self.Sequence_label,
-            self.Revision_label,
-            self.submit_label,
-            self.go_back_label
-        )
-        Utilities.styleInputFields(
-            self.Para_input,
-            self.Surah_input,
-            self.Ayah_input,
-            self.Ruku_input,
-            self.Page_input,
-            self.Time_input,
-            self.Notes_input,
-            self.Sequence_input,
-            self.Revision_input,
-        )
-
-    def submit_form(self):
-        # dummy function
-        TafseerEntry(
-            self.Para_input.text(),
-            self.Surah_input.text(),
-            int(self.Ayah_input.text()),
-            self.Ruku_input.text(),
-            self.Page_input.text(),
-            self.Time_input.text(),
-            self.Notes_input.text(),
-            self.Sequence_input.text(),
-            int(self.Revision_input.text()),
-            self.Revision_input.text(),
-            self.Revision_input.text(),
-            int(self.Revision_input.text()),
-            )
         
 
 class QuranKareem(QWidget):
-    def __init__(self, parent):
+    def __init__(self, go_back_label):
         super().__init__()
-
-        self.main_window = parent
-        self.go_back_label = self.main_window.get_back_label()
+        self.go_back_label = go_back_label
 
         # Widgets
         self.title = QLabel("AL Quran Kareem")
+        Utilities.styleWidgets(self.title)
 
         # **Quran-Screens**
         # Quran-Options-Screen
@@ -222,78 +293,58 @@ class QuranKareem(QWidget):
 
         self.Tilawat_label = ClickableLabel("Al Qur'an (Tilawat) ")
         self.Tilawat_label.leftClicked.connect(self.open_Tilawat_form)
+        Utilities.styleWidgets(self.Tafseer_label, self.Tilawat_label)
 
         self.layout_options_screen = QVBoxLayout(self.options_screen)
         self.layout_options_screen.addWidget(self.Tafseer_label)
         self.layout_options_screen.addWidget(self.Tilawat_label)
         self.layout_options_screen.addWidget(self.go_back_label)
-        Utilities.styleWidgets(self.Tafseer_label, self.Tilawat_label)
 
         # Tafseer Form
-        self.Tafseer_form = QuranKareemForm(self.main_window)
+        self.Tafseer_form = QuranKareemForm()
         self.Tafseer_form.go_back_label.leftClicked.connect(self.back_to_options)
-               
+                       
         # Tilawat Form
-        self.Tilawat_form = QuranKareemForm(self.main_window)
+        self.Tilawat_form = QuranKareemForm(False)
         self.Tilawat_form.go_back_label.leftClicked.connect(self.back_to_options)
-        
+                
         # Quran Screens
-        self.Quran_screens_widget = QWidget()
-        self.Quran_screens_layout = QStackedLayout(self.Quran_screens_widget)
-        self.Quran_screens_layout.addWidget(self.options_screen)
-        self.Quran_screens_layout.addWidget(self.Tafseer_form.form_scroll)
-        self.Quran_screens_layout.addWidget(self.Tilawat_form.form_scroll)
+        self.screens_widget = QWidget()
+        self.screen_stack = QStackedLayout(self.screens_widget)
+        self.screen_stack.addWidget(self.options_screen)
+        self.screen_stack.addWidget(self.Tafseer_form)
+        self.screen_stack.addWidget(self.Tilawat_form)
 
         # Main layout
-        self.Quran_main_screen = QVBoxLayout(self)
-        self.Quran_main_screen.addWidget(self.title)
-        self.Quran_main_screen.addWidget(self.Quran_screens_widget)
-        Utilities.styleWidgets(self.title)
+        self.main_layout = QVBoxLayout(self)
+        self.main_layout.addWidget(self.title)
+        self.main_layout.addWidget(self.screens_widget)
 
     def open_Tafseer_form(self):
-        self.Quran_screens_layout.setCurrentWidget(self.Tafseer_form.form_scroll)
+        self.title.setText("Al Quran Kareem (Tafseer)")
+        self.screen_stack.setCurrentWidget(self.Tafseer_form)
 
     def open_Tilawat_form(self):
-        self.Quran_screens_layout.setCurrentWidget(self.Tilawat_form.form_scroll)
+        self.title.setText("Al Quran Kareem (Tilawat)")
+        self.screen_stack.setCurrentWidget(self.Tilawat_form)
 
     def back_to_options(self):
-        self.Quran_screens_layout.setCurrentWidget(self.options_screen)
-
-    def get_back_btn(self) -> ClickableLabel:
-        go_back_label = ClickableLabel("Go Back")
-        Utilities.styleWidgets(go_back_label)
-        go_back_label.leftClicked.connect(self.back_to_options)
-        return go_back_label
+        self.title.setText("Al Quran Kareem")
+        self.screen_stack.setCurrentWidget(self.options_screen)
 
 
-class OtherSubjectsForm(QWidget):
-    def __init__(self, parent):
+class OtherSubjects(QWidget):
+    def __init__(self, go_back_function):
         super().__init__()
 
-        self.main_window = parent
-        self.go_back_label = self.main_window.get_back_label()
+        self.title = ClickableLabel("Other Subjects")
+        self.other_subjects_form = OtherSubjectsForm()
+        self.other_subjects_form.go_back_label.leftClicked.connect(go_back_function)
+        Utilities.styleWidgets(self.title)
+        self.screen_layout = QVBoxLayout(self)
+        self.screen_layout.addWidget(self.title)
+        self.screen_layout.addWidget(self.other_subjects_form)
 
-        # Main layout
-        self.other_subjects_form = QFormLayout(self)
-        # OtherEntry()
-        self.subject_label = QLabel("Subject:")
-        self.subject_input = QLineEdit()
-        self.book_label = QLabel("Book:")
-        self.book_input = QLineEdit()
-        self.pages_label = QLabel("Pages:")
-        self.pages_input = QLineEdit()
-        self.time_label = QLabel("Time Spent (minutes):")
-        self.time_input = QLineEdit()
-        self.notes_label = QLabel("Notes:")
-        self.notes_input = QLineEdit()
-        self.notes_label = QLabel("Reading Sequentially:")
-        self.notes_input = QLineEdit()
-        Utilities.styleWidgets(self.subject_label)
-        Utilities.styleInputFields(self.subject_input)
-        # Work in Progress
-        self.other_subjects_form.setWidget(0, QFormLayout.LabelRole, self.subject_label)
-        self.other_subjects_form.setWidget(0, QFormLayout.FieldRole, self.subject_input)
-        self.other_subjects_form.addWidget(self.go_back_label)
 
 
 class SaveProgress(QWidget):
@@ -301,7 +352,12 @@ class SaveProgress(QWidget):
         super().__init__()
 
         self.main_window = parent
-        self.go_back_label = self.main_window.get_back_label()
+        self.go_back_label = QLabel("Go Back")
+        self.go_back_label.setStyleSheet(
+            "QLabel{background: red;}"
+            )
+        
+        
 
         # Main layout
         self.layout = QVBoxLayout(self)
@@ -356,8 +412,8 @@ class MainWindow(QMainWindow):
 
         # All Screens
         self.main_menu = MainMenu(self)
-        self.Quran_Kareem = QuranKareem(self)
-        self.other_subjects = OtherSubjectsForm(self)
+        self.Quran_Kareem = QuranKareem(self.get_back_label())
+        self.other_subjects = OtherSubjects(self.go_back)
         self.save_screen = SaveProgress(self)
         self.view_screen = ViewProgress(self)
         self.delete_screen = DeleteProgress(self)
