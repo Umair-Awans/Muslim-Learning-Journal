@@ -97,14 +97,15 @@ class DataManager:
 
     def add_stats(self, subject, book_name, entry_dict: dict):
         self.stats.setdefault(subject, {}).setdefault(book_name, {})
-        if self.date_today not in self.stats[subject][book_name]["Entry Dates"]:
-            self.stats[subject][book_name]["Entry Dates"].append(self.date_today)
-
+        
         self.stats = dict(sorted(self.stats.items(), key=lambda item: item[0].lower()))
         self.stats[subject] = dict(sorted(self.stats[subject].items(), key=lambda item: item[0].lower()))
         self.stats[subject][book_name].setdefault("Pages", 0)
         self.stats[subject][book_name].setdefault("Time Spent", "")
         self.stats[subject][book_name].setdefault("Entry Dates", [])
+
+        if self.date_today not in self.stats[subject][book_name]["Entry Dates"]:
+            self.stats[subject][book_name]["Entry Dates"].append(self.date_today)
 
         self.stats[subject][book_name]["Pages"] += entry_dict["Total Pages"]
 

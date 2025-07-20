@@ -14,10 +14,10 @@ class StatsManager:
         print(f"\n-------------( {title} )-------------\n")
         total_time = Utilities.format_time(total_minutes)
         prompts = [
-            f"\nYou spent a total of {total_time} on learning activities over the past {duration}.\n",
-            f"\nNo learning activity was recorded for this {duration}.\n"
+            f"\nYou spent a total of {total_time} on learning activities during the previous {duration} (excluding today).\n",
+            f"\nNo learning activity was recorded during the previous {duration} (excluding today).\n"
         ]
-        index = 0 if total_time != "0 min(s)" else 1
+        index = 0 if total_minutes > 0 else 1
         print(prompts[index])
 
     @staticmethod
