@@ -22,31 +22,31 @@ class StatsManager:
 
     @staticmethod
     def get_last_seven_days() -> list:
-        num_day = int(datetime.today().strftime("%d"))
-        month = datetime.today().strftime("%b")
-        num_month = int(datetime.today().strftime("%m"))
-        year = int(datetime.today().strftime("%Y"))
-        last_month_days = 0
-        if num_day <= 7:
+        today = datetime.today()
+        month = today.strftime("%b")
+        day = today.day
+        num_month = today.month
+        year = today.year
+        last_month_days = None
+        if day <= 7:
+            last_month_num = (num_month - 2) % 12 + 1
             if num_month == 1:
-                last_month_num = 12
                 year -= 1
-            else:
-                last_month_num = num_month - 1
             month, last_month_days = DateManager.get_month_and_days(
                 last_month_num, year)
-            num_day = (last_month_days + num_day) - 7
+            day = (last_month_days + day) - 7
         else:
-            num_day -= 7
+            day -= 7
         last_seven_days = []
         for _ in range(7):
-            date = f"{num_day}-{month}-{year}"
+            date = f"{day:02}-{month}-{year}"
             last_seven_days.append(date)
-            num_day += 1
-            if last_month_days and num_day == last_month_days:
-                num_day = 1
-                year = year + 1 if last_month_num == 12 else year  # type: ignore
+            day += 1
+            if last_month_days and day > last_month_days:
+                day = 1
+                year = year + 1 if last_month_num == 12 else year # type: ignore
                 month, _ = DateManager.get_month_and_days(num_month, year)
+                last_month_days = None
         return last_seven_days
 
     @classmethod
