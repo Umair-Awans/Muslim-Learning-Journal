@@ -308,10 +308,29 @@ class DateManager:
         return f"{day}-{month}-{year}"
 
 
-
 class Utilities:
     @staticmethod
-    def pop_empty_dicts(dict_: dict, dict1: str, dict2: str):
+    def extract_sort_key(book_title: str):
+        try:
+            # Try extracting number from end
+            num = int(book_title.split()[-1])
+            return (0, num)  # 0 = numeric books, then sort by number
+        except ValueError:
+            return (1, book_title.lower())  # 1 = text-only books, then sort alphabetically
+
+    @classmethod
+    def dict_sort(cls, dict_: dict) -> dict:
+        return dict(sorted((dict_.items()), key=lambda x: cls.extract_sort_key(x[0])))
+
+    @staticmethod
+    def set_defaults_for_stats(dict_stats: dict, subject: str, book: str) -> None:
+        dict_stats.setdefault(subject, {}).setdefault(book, {})
+        dict_stats[subject][book].setdefault("Pages", 0)
+        dict_stats[subject][book].setdefault("Time Spent", "")
+        dict_stats[subject][book].setdefault("Entry Dates", [])
+
+    @staticmethod
+    def pop_empty_dicts(dict_: dict, dict1: str, dict2: str) -> None:
         if not dict_[dict1][dict2]:
             dict_[dict1].pop(dict2)
             if not dict_[dict1]:
@@ -340,7 +359,6 @@ class Utilities:
 
 
 class Validation:
-
     @staticmethod
     def get_time_spent(book: str):
         mins_spent = validate_number(

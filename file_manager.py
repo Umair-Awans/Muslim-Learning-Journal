@@ -5,7 +5,7 @@ class FileManager:
     @staticmethod
     def load_file(file_path_json: str) -> dict:
         try:
-            with open(file_path_json, 'r') as file:
+            with open(file_path_json, 'r', encoding="utf-8") as file:
                 return json.load(file)
         except (FileNotFoundError, json.JSONDecodeError):
             return {}
@@ -20,7 +20,7 @@ class FileManager:
             file_path_md (str): string containing MD file path 
         """        
         try:
-            with open(file_path_md, 'w') as file:
+            with open(file_path_md, 'w', encoding="utf-8") as file:
                 if not dict_entries:
                     file.write("")
                 else:
@@ -46,8 +46,8 @@ class FileManager:
     @staticmethod
     def save_to_json(dict_: dict, file_path_json: str) -> None:
         try:
-            with open(file_path_json, 'w') as file:
-                json.dump(dict_, file, indent=4)
+            with open(file_path_json, 'w', encoding="utf-8") as file:
+                json.dump(dict_, file, indent=4, ensure_ascii=False)
                 print("\nProgress saved successfully!")
         except IOError as e:
             print(f"\nError: {e}")
@@ -96,16 +96,13 @@ class DataManager:
                 self.all_time_subjects[subject].sort()
 
     def add_stats(self, subject, book_name, entry_dict: dict):
-        self.stats.setdefault(subject, {}).setdefault(book_name, {})
+        Utilities.set_defaults_for_stats(self.stats, subject, book_name)
+        self.stats = Utilities.dict_sort(self.stats)
+        self.stats[subject] = Utilities.dict_sort(self.stats[subject])
+
         if self.date_today not in self.stats[subject][book_name]["Entry Dates"]:
             self.stats[subject][book_name]["Entry Dates"].append(self.date_today)
-
-        self.stats = dict(sorted(self.stats.items(), key=lambda item: item[0].lower()))
-        self.stats[subject] = dict(sorted(self.stats[subject].items(), key=lambda item: item[0].lower()))
-        self.stats[subject][book_name].setdefault("Pages", 0)
-        self.stats[subject][book_name].setdefault("Time Spent", "")
-        self.stats[subject][book_name].setdefault("Entry Dates", [])
-
+            
         self.stats[subject][book_name]["Pages"] += entry_dict["Total Pages"]
 
         all_time_minutes = Utilities.convert_time_to_mins(self.stats[subject][book_name]["Time Spent"])

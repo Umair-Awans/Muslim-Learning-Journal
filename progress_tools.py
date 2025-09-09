@@ -55,7 +55,7 @@ class ProgressLogger:
                 subject = input("\nEnter a subject name: ").strip()
                 subject = "Qur'an" if subject == "Al-Qur'an (Tafseer)" else subject
                 if subject:
-                    return subject, None
+                    return subject, data.all_time_subjects.get(subject)
                 print("\nSubject cannot be blank.")
 
         @classmethod
@@ -67,10 +67,10 @@ class ProgressLogger:
                 if user_choice != 1:
                     return books_menu_list[user_choice - 1] # type: ignore
             while True:
-                book = input(
+                book_name = input(
                     f"Enter the \"{subject}\" book or material title: ").strip()
-                if book:
-                    return book
+                if book_name:
+                    return book_name
                 print("\nBook title cannot be blank.")
 
         @classmethod

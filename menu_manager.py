@@ -88,11 +88,13 @@ class Menus:
     def main_menu(cls) -> None:
         print("\n<><><>__( Muslim Learning Journal )__<><><>\n")
         data = DataManager()
-        StatsManager.get_weekly_report(data)
+        StatsManager.build_subjects_cache(data)
+        StatsManager.calculate_stats(data)
+        StatsManager.display_stats(data)
 
         MENU_ITEMS = [
             "Al-Qur'an (Tafseer)", "Al-Qur'an (Tilawat)", "Log Other Subjects",
-            "Save Progress", "View Entries", "Edit Entries", "Delete Entries"
+            "Save Progress", "View Entries", "Edit Entries", "Delete Entries", "Check Weekly Report"
         ]
         main_menu = Menu(MENU_ITEMS)
         
@@ -115,3 +117,5 @@ class Menus:
                 cls.edit_progress_menu(data)
             elif user_choice == 7:
                 cls.delete_progress_menu(data)
+            elif user_choice == 8:
+                StatsManager.display_plot(data)
