@@ -11,7 +11,7 @@ class FileManager:
             return {}
 
     @staticmethod
-    def save_entries_as_md(dict_entries: dict, file_path_md: str) -> None:
+    def save_to_md(dict_entries: dict, file_path_md: str) -> bool:
         """
         Save learning entries to a Markdown file with formatted sections for Qur'an and other subjects.
 
@@ -38,19 +38,18 @@ class FileManager:
 
                         # Add daily summary if needed
                         file.write("---\n\n")  # Horizontal rule for separation between dates
-        except IOError:
-            print(
-                "\nCouldn't create markdown file. Please check file permissions or disk space.\n"
-            )
+            return True
+        except Exception:
+            return False
 
     @staticmethod
-    def save_to_json(dict_: dict, file_path_json: str) -> None:
+    def save_to_json(dict_: dict, file_path_json: str) -> bool:
         try:
             with open(file_path_json, 'w', encoding="utf-8") as file:
                 json.dump(dict_, file, indent=4, ensure_ascii=False)
-                print("\nProgress saved successfully!")
-        except IOError as e:
-            print(f"\nError: {e}")
+            return True
+        except Exception:
+            return False
 
 
 class DataManager:
@@ -61,14 +60,7 @@ class DataManager:
         self.entry_log = self.data.get("Entry Log", {})
         self.all_time_subjects = self.data.get("All Time Subjects", {})
         self.stats = self.data.get("Statistics", {})
-        self.sync_data_today()
-
-    def update_date_today(self):
-        self.date_today = DateManager.get_date_today()
-
-    def sync_data_today(self):
-        self.update_date_today()
-        self.progress_today = self.entry_log.get(self.date_today, {})
+        self.sync_data_today()       
 
     @property
     def file_dict(self) -> dict:
@@ -78,7 +70,14 @@ class DataManager:
                     "Statistics": self.stats
                 }
 
-    def append_entry(self, subject: str, book_name: str, entry_dict: dict) -> None:
+    def update_date_today(self):
+        self.date_today = DateManager.get_date_today()
+
+    def sync_data_today(self):
+        self.update_date_today()
+        self.progress_today = self.entry_log.get(self.date_today, {})
+
+    def add_entry(self, subject: str, book_name: str, entry_dict: dict) -> None:
         self.sync_data_today()
         entry = f"Entry {DateManager.get_current_time()}"
         self.progress_today.setdefault(subject, {}).setdefault(book_name, {})
@@ -143,6 +142,9 @@ class DataManager:
             self.entry_log.pop(day)
 
     def save_progress_to_files(self):
-        FileManager.save_to_json(self.file_dict, self.__FILE_JSON)
-        FileManager.save_entries_as_md(self.entry_log, self.FILE_MD)
+        if not FileManager.save_to_json(self.file_dict, self.__FILE_JSON):
+            return 1
+        if not FileManager.save_to_md(self.entry_log, self.FILE_MD):
+            return 2
+        return 0
 

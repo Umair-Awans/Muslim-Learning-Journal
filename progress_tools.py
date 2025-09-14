@@ -1,9 +1,8 @@
 import random
 from copy import deepcopy
-from entries import TafseerEntry, TilawatEntry, OtherEntry
+from entries import TafseerEntry, TilawatEntry, OtherEntry, CliEntryEditor, EntryFactory
 from file_manager import DataManager
-from core_utils import (Validation, Utilities, validate_choice,
-                        validate_number, Menu)
+from core_utils import (CliInputCollector, Utilities, InputProvider, Menu)
 
 
 class ProgressLogger:
@@ -25,14 +24,14 @@ class ProgressLogger:
             method_full = f"Al-Qur'an ({method})"
             print(f"\n<><><>__( {method_full} )__<><><>")
             while True:
-                Para_number = Validation.get_first_and_last("Para", 30)[0]
+                Para_number = CliInputCollector.get_entry_range("Para", 30)[0]
                 Para = f"Para no. {Para_number}"
-                if method == "Tafseer":
-                    entry = TafseerEntry.from_user_input(method_full)
-                else:
-                    entry = TilawatEntry.from_user_input(method_full)                
-                data.append_entry(method_full, Para, entry.to_dict())
-                if validate_choice(
+                entry, msg = EntryFactory.make_Quran_entry({"book": method_full})                
+                if not entry:
+                    print(msg)
+                    return
+                data.add_entry(method_full, Para, entry.to_dict())
+                if InputProvider.validate_choice(
                     f"\nDo you want to add another {method_full} entry to the log?", ["Y", "N"]) == "N":
                     return
 
@@ -79,14 +78,17 @@ class ProgressLogger:
             print(f"\n<><><>__(<<[ {subject} ]>>)__<><><>\n")
             book_name = cls.get_book_name(subject, books_list)
             print(f"\n<><><>__(<< {book_name} >>)__<><><>\n")
-            entry = OtherEntry.from_user_input(book_name)
-            data.append_entry(subject, book_name, entry.to_dict())
+            entry, msg = EntryFactory.make_other_entry({"book": book_name})
+            if not entry:
+                print(msg)
+                return
+            data.add_entry(subject, book_name, entry.to_dict())
 
         @classmethod
         def log_other_progress(cls, data: DataManager) -> None:
             while True:
                 cls.get_and_add_progress(data)
-                if validate_choice(
+                if InputProvider.validate_choice(
                     "\nWould you like to add another entry to today's log?",
                     ["Y", "N"]) == "N":
                     return
@@ -95,18 +97,18 @@ class ProgressLogger:
 class ProgressEditor:                
     @classmethod
     def update_entry_pages(cls, details, entry_pages, stats, add = False):
-        if not add:
-            stats[details[0]][details[1]]["Pages"] -= entry_pages
-        else:
+        if add:
             stats[details[0]][details[1]]["Pages"] += entry_pages
+        else:
+            stats[details[0]][details[1]]["Pages"] -= entry_pages
 
     @classmethod
     def update_entry_minutes(cls, details, entry_time_spent, stats, add = False):
         temp_total_minutes = Utilities.convert_time_to_mins(stats[details[0]][details[1]]["Time Spent"])
-        if not add:
-            temp_total_minutes -= Utilities.convert_time_to_mins(entry_time_spent)
-        else:
+        if add:
             temp_total_minutes += Utilities.convert_time_to_mins(entry_time_spent)
+        else:
+            temp_total_minutes -= Utilities.convert_time_to_mins(entry_time_spent)
         stats[details[0]][details[1]]["Time Spent"] = Utilities.format_time(temp_total_minutes)
 
     @classmethod
@@ -126,6 +128,7 @@ class ProgressEditor:
             
     @classmethod
     def edit_subject(cls, details: tuple, editable_entries: list, entry_instance, data: DataManager):
+        editor = CliEntryEditor(entry=entry_instance)
         entries_menu = Menu(editable_entries, details[2])
         while True:
             user_choice, exit_option = entries_menu.display_menu() # type: ignore
@@ -137,7 +140,7 @@ class ProgressEditor:
                 cls.update_stats(details, entry_instance, stats, field)
                 data.update_stats(stats)
             else:
-                entry_instance.edit_field(field)
+                editor.edit_field(field)
             print(f"\n{field} updated!\n")
         
     @classmethod
@@ -146,15 +149,15 @@ class ProgressEditor:
             if not progress:
                 print("\nNo progress to edit.")
                 return            
-            subject = Validation.get_a_key(progress, "Subject")
+            subject = InputProvider.choose_key(progress, "Subject")
             if not subject:
-                if validate_choice("\nBack to Main Menu? ", ["Y", "N"]) == "Y":
+                if InputProvider.validate_choice("\nBack to Main Menu? ", ["Y", "N"]) == "Y":
                     return
             book_title = "Para" if subject in ["Al-Qur'an (Tilawat)", "Al-Qur'an (Tafseer)"] else "Book"
-            book_name = Validation.get_a_key(progress[subject], book_title)
+            book_name = InputProvider.choose_key(progress[subject], book_title)
             if not book_name:
                 continue                
-            session = Validation.get_a_key(progress[subject][book_name], "Session")
+            session = InputProvider.choose_key(progress[subject][book_name], "Session")
             if not session:
                 continue                
             dict_to_edit = progress[subject][book_name][session]
@@ -166,7 +169,7 @@ class ProgressEditor:
                 entry_instance = OtherEntry.from_dict(book_name, dict_to_edit)
             title = f"{book_name} ( {session} )"
             ProgressDisplay.display_entries(title, entry_instance.to_dict())
-            next_choice = validate_number(
+            next_choice = InputProvider.validate_number(
                 f"\nOptions:\n1. Edit details\n2. Remove all entries for {title}\n\nYour Choice: ",
                 1, 2)
             details = (subject, book_name, session)
@@ -175,7 +178,7 @@ class ProgressEditor:
                 cls.edit_subject(details, editable_entries, entry_instance, data)
                 progress[subject][book_name][session] = entry_instance.to_dict()
             else:
-                if validate_choice(
+                if InputProvider.validate_choice(
                     f"\nAre you sure you want to delete all entries for {title}?",
                     ["Y", "N"]) == "Y":
                     progress[subject][book_name].pop(session)
