@@ -87,12 +87,13 @@ class DataManager:
         self.update_entry_log("", {})
 
     def add_to_cache(self, subject, book_name):
-        if subject not in ["Al-Qur'an (Tafseer)", "Al-Qur'an (Tilawat)"]:
-            self.all_time_subjects.setdefault(subject, [])
-            self.all_time_subjects = dict(sorted(self.all_time_subjects.items(), key=lambda item: item[0].lower()))
-            if book_name not in self.all_time_subjects[subject]:
-                self.all_time_subjects[subject].append(book_name)
-                self.all_time_subjects[subject].sort()
+        if subject in ["Al-Qur'an (Tafseer)", "Al-Qur'an (Tilawat)"]:
+            return
+        self.all_time_subjects.setdefault(subject, [])
+        self.all_time_subjects = Utilities.dict_sort(self.all_time_subjects)
+        if book_name not in self.all_time_subjects[subject]:
+            self.all_time_subjects[subject].append(book_name)
+            self.all_time_subjects[subject].sort()
 
     def add_stats(self, subject, book_name, entry_dict: dict):
         Utilities.set_defaults_for_stats(self.stats, subject, book_name)
@@ -123,6 +124,9 @@ class DataManager:
         elif date in self.entry_log and not self.entry_log[date]:
             self.entry_log.pop(date)
 
+    def get_entries_from_date(self, date: str):
+        return self.entry_log.get(date, {})
+
     def delete_stats(self, day: str):
         from progress_tools import ProgressEditor
         for subject, subject_entries in self.entry_log[day].items():
@@ -133,13 +137,17 @@ class DataManager:
                         ProgressEditor.update_entry_pages((subject, book), entry_details["Total Pages"], self.stats)
                         ProgressEditor.update_entry_minutes((subject, book), entry_details["Time Spent"], self.stats)
                     
-    def delete_progress(self, day: str):
-        if day == "ALL_TIME":
+    def delete_progress(self, date: str = "None", delete_all: bool = False):
+        if delete_all:
             self.entry_log.clear()
             self.stats.clear()
-        elif day in self.entry_log:
-            self.delete_stats(day)
-            self.entry_log.pop(day)
+            return True, "All data deleted successfully!"
+        elif date in self.entry_log:
+            self.delete_stats(date)
+            self.entry_log.pop(date)
+            return True, f"All entries from {date if date != DateManager.get_date_today() else f'today ({date})'} deleted successfully!"
+        return False, f"No entries recorded for {date if date != DateManager.get_date_today() else f'today ({date})'}."
+        
 
     def save_progress_to_files(self):
         if not FileManager.save_to_json(self.file_dict, self.__FILE_JSON):

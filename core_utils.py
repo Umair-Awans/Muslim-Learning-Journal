@@ -490,3 +490,19 @@ class CliInputCollector:
     @staticmethod
     def get_chapter():
         return input("\nEnter chapter name (optional): ").strip() or "N/A"
+
+
+class DeleteController:
+    DEL_OPTIONS = [
+        "Delete today's entries", "Delete entries from another day", "Delete all recorded entries"
+    ]
+
+    @staticmethod
+    def delete_day(date: str, data_manager):
+        return data_manager.delete_progress(date=date)
+
+    @staticmethod
+    def delete_all(password: str, data_manager):
+        if not PasswordManager.verify_password(password):
+            return False, "WRONG PASSWORD!"
+        return data_manager.delete_progress(delete_all=True)

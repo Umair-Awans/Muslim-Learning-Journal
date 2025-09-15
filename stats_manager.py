@@ -1,4 +1,3 @@
-from datetime import datetime
 from entries import TafseerEntry, TilawatEntry, OtherEntry
 from file_manager import DataManager
 from core_utils import DateManager, Utilities
@@ -40,13 +39,13 @@ class StatsManager:
                 for subject, dict_subject in self.data.entry_log[date].items():
                     for book, book_entry in dict_subject.items():
                         for session, session_entry in book_entry.items():
-                            time_spent, entry_pages = self.extract_time_spent(subject, book, session_entry)
+                            time_spent, entry_pages = self.extract_time_and_pages(subject, book, session_entry)
                             total_minutes += Utilities.convert_time_to_mins(time_spent)
                             total_pages += entry_pages
             self.weekly_report[date] = (total_minutes, total_pages)
 
     @staticmethod
-    def extract_time_spent(subject, book, session_entry):
+    def extract_time_and_pages(subject, book, session_entry):
         map_dict = {
             "Al-Qur'an (Tafseer)": TafseerEntry.from_dict,
             "Al-Qur'an (Tilawat)": TilawatEntry.from_dict

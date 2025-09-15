@@ -1,254 +1,25 @@
 import sys
-from PyQt5.QtGui import QIcon, QIntValidator,QDoubleValidator
-from PyQt5.QtCore import Qt, QRect, QTimer
+from io import StringIO
+from datetime import datetime
+from PyQt5.QtGui import QIcon, QIntValidator, QDoubleValidator
+from PyQt5.QtCore import Qt, QRect, QTimer, QDate, pyqtSignal
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, 
-                             QGridLayout, QAction, QFileDialog,
+                             QGridLayout, QAction, QHBoxLayout,
                              QCheckBox, QMessageBox, QVBoxLayout,
-                             QScrollArea, QMenu, QLabel,
+                             QScrollArea, QMenu, QLabel, QDateEdit,
                              QFormLayout, QLineEdit, QStackedLayout,
                              QComboBox, QTabWidget, QStatusBar,
-                             QTextBrowser, QPushButton, QTextEdit)
+                             QTextBrowser, QPushButton, QTextEdit,
+                             QRadioButton)
 
-sys.path.append("../Modules")
-from MyQt5 import ClickableLabel
+from gui_utils import ClickableLabel, GuiDataCollector, GuiUtilities, StyleUtilities
 from entries import EntryFactory, DataCarrier
-from core_utils import Utilities, ProgressUtils, PasswordManager
+from core_utils import PasswordManager, DateManager, DeleteController
 from file_manager import DataManager
+from progress_tools import ProgressDisplay
 
 DATA = DataManager()
 
-
-class DataProcessor:
-    @staticmethod
-    def stoi(data: dict):
-        for key in data.keys():
-            if not "from" in key and not "to" in key:
-                continue
-            data[key] = float(data[key] or "0")
-            if data[key] == int(data[key]):
-                data[key] = int(data[key])
-
-    @classmethod
-    def validate_pair_fields(cls, pair_fields: list):
-        for field_name, field1, field2 in pair_fields:
-            ok, msg = FormValidation.verify_range_fields(field_name, field1, field2)
-            if not ok:
-                return False, msg
-        return True, ""
-
-    @staticmethod
-    def finalize_common_data(book: str,carrier: DataCarrier):
-        page_from = carrier.common_raw_data["page_from"]
-        page_to = carrier.common_raw_data["page_to"]
-        hours = carrier.common_raw_data["hours"]
-        minutes = carrier.common_raw_data["minutes"]
-        notes = carrier.common_raw_data["notes"].strip() or "N/A"
-        reading_mode = "Sequential" if carrier.common_raw_data["reading_mode"] else "Random"
-        revision = carrier.common_raw_data["revision"].strip() or "No"
-        pages, total_pages = ProgressUtils.get_str_and_total(page_from, page_to)
-        time_spent = Utilities.get_time_str(hours, minutes)
-        carrier.common_data = {
-                "book": book,
-                "pages": pages,
-                "total_pages": total_pages,
-                "time_spent": time_spent,
-                "notes": notes,
-                "reading_mode": reading_mode,
-                "revision": revision
-            }
-        return True
-
-    @classmethod
-    def process_common_data(cls, carrier: DataCarrier):
-        cls.stoi(carrier.common_raw_data)
-        valid, msg = cls.validate_pair_fields([("Page", carrier.common_raw_data["page_from"], carrier.common_raw_data["page_to"])])
-        if not valid:
-            return False, msg
-        return FormValidation.both_fields_empty("Time Spent", carrier.common_raw_data["hours"], carrier.common_raw_data["minutes"])
-
-    @classmethod
-    def finalize_Quran_data(cls, carrier: DataCarrier):
-        Para = ProgressUtils.get_str_and_total(carrier.raw_data["Para_from"], carrier.raw_data["Para_to"])[0]
-        Ruku, tota_Ruku = ProgressUtils.get_str_and_total(carrier.raw_data["Ruku_from"], carrier.raw_data["Ruku_to"])
-        Para = f"Para no. {Para}"
-        carrier.data = {"Ruku": Ruku, "total_Ruku": tota_Ruku}
-        if "Surah_from" in carrier.raw_data:
-            Surah_from = carrier.raw_data["Surah_from"]
-            Surah_to = carrier.raw_data["Surah_to"]
-            Ayah_from = carrier.raw_data["Ayah_from"]
-            Ayah_to = carrier.raw_data["Ayah_to"]
-            carrier.data["Surah_number"] = ProgressUtils.get_str_and_total(Surah_from, Surah_to)[0]
-            carrier.data["Ayah"], carrier.data["total_Aayat"] = ProgressUtils.get_str_and_total(Ayah_from, Ayah_to)
-        return cls.finalize_common_data(Para, carrier)
-
-    @classmethod
-    def process_Quran_data(cls, carrier: DataCarrier):
-        cls.stoi(carrier.raw_data)
-        pairs = []
-        pairs.append(("Para", carrier.raw_data["Para_from"], carrier.raw_data["Para_to"]))
-        if "Surah_from" in carrier.raw_data:
-            pairs.append(("Surah", carrier.raw_data["Surah_from"], carrier.raw_data["Surah_to"]))
-            pairs.append(("Ayah", carrier.raw_data["Ayah_from"], carrier.raw_data["Ayah_to"]))
-        pairs.append(("Ruku", carrier.raw_data["Ruku_from"], carrier.raw_data["Ruku_to"]))
-        valid, msg = cls.validate_pair_fields(pairs)
-        if not valid:
-            return False, msg
-        valid, msg = cls.process_common_data(carrier)
-        if not valid:
-            return False, msg
-        return cls.finalize_Quran_data(carrier), "Failed to save data"
-
-    @classmethod
-    def finalize_other_data(cls, carrier: DataCarrier):
-        subject = carrier.raw_data["subject"].strip()
-        book = carrier.raw_data["book"].strip()
-
-        if not subject or not book:
-            return False, "Can't leave Subject or Book field empty"
-
-        carrier.data["unit"] = ProgressUtils.get_str_and_total(carrier.raw_data["unit_from"], carrier.raw_data["unit_to"])[0]
-        carrier.data["chapter"] = carrier.raw_data["chapter"].strip() or "N/A"
-        return cls.finalize_common_data(book, carrier)
-
-    @classmethod
-    def process_other_data(cls, carrier: DataCarrier):
-        cls.stoi(carrier.raw_data)
-        pairs = [("Unit", carrier.raw_data["unit_from"], carrier.raw_data["unit_to"])]
-        valid, msg = cls.validate_pair_fields(pairs)
-        if not valid:
-            return False, msg
-        valid, msg = cls.process_common_data(carrier)
-        if not valid:
-            return False, msg
-        return cls.finalize_other_data(carrier), "Failed to save data"
-
-        
-class StyleUtilities:
-
-    @staticmethod
-    def get_gradient(hover: bool, title: bool = False) -> str:
-        if title:
-            top_color = "#E6E6E6" if not hover else "#F2F2F2"
-            bottom_color = "#BFBFBF" if not hover else "#D9D9D9"
-        else:
-            top_color = "#D9D9D9" if not hover else "#E6E6E6"
-            bottom_color = "#BFBFBF" if not hover else "#CCCCCC"
-
-        return f"""qlineargradient(
-            spread:pad,
-            x1:0, y1:0, x2:0, y2:1,
-            stop:0 {top_color},
-            stop:1 {bottom_color});"""
-
-    @classmethod
-    def styleWidgets(cls, *widgets, form_labels=False):
-        for widget in widgets:
-            FONT = 'Segoe Script' if not isinstance(
-                widget, ClickableLabel) else 'Fira code'
-            FONT_SIZE = 35 if not isinstance(widget, ClickableLabel) else 30
-            # FONT_COLOR = "#19c25f" if not isinstance(widget, ClickableLabel) else "#2077ce"
-            FONT_COLOR = "#333333"
-            BG_COLOR = cls.get_gradient(False) if isinstance(
-                widget, ClickableLabel) else cls.get_gradient(False, True)
-            widget.setAlignment(Qt.AlignCenter)
-            normal_style = f"""QLabel{{
-            border-radius: 5px;
-            font-weight: 500;
-            color: {FONT_COLOR};
-            background: {BG_COLOR};
-            font-size: {FONT_SIZE}px;
-            font-family: {FONT}, Tahoma;
-            padding: 10px;
-            }}
-            ClickableLabel:hover{{
-            background: {cls.get_gradient(True)};
-            }}"""
-            pressed_style = f"""
-                border-radius: 5px;
-                font-weight: 500;
-                color: #333333;
-                background: {BG_COLOR};
-                font-size: {FONT_SIZE}px;
-                font-family: {FONT}, Tahoma;
-                padding: 10px;
-            """
-            widget.setStyleSheet(normal_style)
-            if isinstance(widget, ClickableLabel):
-                widget.setPressedStyle(pressed_style)
-            if form_labels:
-                widget.setFixedWidth(550)
-
-    @staticmethod
-    def styleInputFields(*widgets, form_inputs=False):
-        for widget in widgets:
-            widget.setStyleSheet("""QLineEdit, QComboBox{
-                background-color: none;
-                font-size: 25px;
-                padding: 10px;
-            }""")
-            if form_inputs:
-                widget.setFixedWidth(250)
-
-    @staticmethod
-    def styleFormElements(*widgets):
-        for widget in widgets:
-            # widget.setMinimumWidth(280)
-            widget.setMinimumHeight(40)
-            widget.setStyleSheet("""QLineEdit, QTextEdit, QComboBox, QLabel{
-                font-size: 25px;
-                font-family: consolas;
-                }
-                QLineEdit, QTextEdit{
-                    background-color: white;
-                }""")
-            if not isinstance(widget, QCheckBox) and not isinstance(
-                    widget, QComboBox) and not isinstance(widget, QTextEdit):
-                widget.setAlignment(Qt.AlignCenter)
-            if isinstance(widget, QTextEdit):
-                widget.setMinimumHeight(100)
-
-            if isinstance(widget, QLabel):
-                widget.setAlignment(Qt.AlignCenter)
-
-
-class GuiUtilities:
-    @staticmethod
-    def show_information_msg(message: str):
-        QMessageBox.information(QWidget(), 'Muslim Learning Journal',
-                                    message,
-                                    QMessageBox.Ok, QMessageBox.Ok)
-
-    @staticmethod
-    def show_warning_msg(message: str):
-        QMessageBox.warning(QWidget(), 'Muslim Learning Journal',
-                                    message,
-                                    QMessageBox.Ok, QMessageBox.Ok)
-
-    @staticmethod
-    def show_critical_msg(message: str):
-        QMessageBox.critical(QWidget(), 'Muslim Learning Journal',
-                                    message,
-                                    QMessageBox.Ok, QMessageBox.Ok)
-
-class FormValidation:
-    @staticmethod
-    def both_fields_empty(field_name: str, field1, field2):
-        if not field1 and not field2:
-            return False, f"Can't leave {field_name} fields empty."
-        return True, ""
-
-    @staticmethod
-    def are_fields_in_order(field_name: str, field1, field2):
-        if field1 and field2 and not field1 <= field2:
-            return False, f"{field_name}: 'From' field must be smaller than 'To' field"
-        return True, ""
-
-    @classmethod
-    def verify_range_fields(cls, field_name: str, field1, field2):
-        valid, msg = cls.both_fields_empty(field_name, field1, field2)
-        if not valid:
-            return False, msg
-        return cls.are_fields_in_order(field_name, field1, field2)
 
 class EntryFormWidget(QScrollArea):
     """
@@ -279,12 +50,7 @@ class EntryFormWidget(QScrollArea):
         self.submit_label = ClickableLabel("Submit")
 
         StyleUtilities.styleWidgets(self.submit_label)
-        StyleUtilities.styleFormElements(self.qlPage, self.qlTime,
-                                    self.qlNotes, self.qlReadingMode,
-                                    self.qlRevision, self.qlePage1,
-                                    self.qlePage2, self.qleTime1,
-                                    self.qleTime2, self.qteNotes,
-                                    self.qchbReadingMode, self.qteRevision)
+        StyleUtilities.styleFormElements(self.entry_form_widget)
 
         self.commons_widget = QWidget()
         self.commons_layout = QGridLayout(self.commons_widget)
@@ -335,6 +101,7 @@ class QuranKareemForm(EntryFormWidget):
 
     def __init__(self, Tafseer=True, parent=None):
         super().__init__(parent)
+        self.Tafseer = Tafseer
         self.form_widget = QWidget()
         self.form_layout = QGridLayout(self.form_widget)
 
@@ -350,18 +117,12 @@ class QuranKareemForm(EntryFormWidget):
         self.qlPage.setMinimumWidth(170)
         self.qlPara.setMinimumWidth(170)
 
-        if Tafseer:
+        if self.Tafseer:
             self.qlSurah, self.qleSurah1, self.qleSurah2 = self.make_triplet(
                 "Surah:", 1.0, 114.0)
             self.qlAyah, self.qleAyah1, self.qleAyah2 = self.make_triplet(
                 "Ayah:", 1.0, 9999.0)
 
-            StyleUtilities.styleFormElements(self.qlPara, self.qlePara1,
-                                        self.qlePara2, self.qlSurah,
-                                        self.qleSurah1, self.qleSurah2,
-                                        self.qlAyah, self.qleAyah1,
-                                        self.qleAyah2, self.qlRuku,
-                                        self.qleRuku1, self.qleRuku2)
             self.add_to_layout([
                 (self.qlPara, self.qlePara1, self.qlePara2),
                 (self.qlSurah, self.qleSurah1, self.qleSurah2),
@@ -369,15 +130,12 @@ class QuranKareemForm(EntryFormWidget):
                 (self.qlRuku, self.qleRuku1, self.qleRuku2)
             ])
         else:
-            StyleUtilities.styleFormElements(self.qlPara, self.qlePara1,
-                                        self.qlePara2, self.qlRuku,
-                                        self.qleRuku1, self.qleRuku2)
             self.add_to_layout([
                 (self.qlPara, self.qlePara1, self.qlePara2),
                 (self.qlRuku, self.qleRuku1, self.qleRuku2)
             ])
 
-        self.submit_label.leftClicked.connect(self.submit_form)
+        self.submit_label.leftClicked.connect(self.submit_form) #type: ignore
 
     def add_to_layout(self, *widgets):
         """
@@ -404,7 +162,7 @@ class QuranKareemForm(EntryFormWidget):
 
 
     def collect_raw_input(self):
-        if hasattr(self, "qlSurah"):
+        if self.Tafseer:
             return {
                 "Para_from": self.qlePara1.text(),
                 "Para_to": self.qlePara2.text(),
@@ -425,20 +183,20 @@ class QuranKareemForm(EntryFormWidget):
 
 
     def submit_form(self):
-        if hasattr(self, "qlSurah"):
+        if self.Tafseer:
             subject = "Al-Qur'an (Tafseer)"
         else:
             subject = "Al-Qur'an (Tilawat)"
-        entry, msg = EntryFactory.make_Quran_entry({"form": self, "book": subject}, GuiDataCollector)
+        entry, msg = EntryFactory.make_Quran_entry({"form": self, "book": subject}, GuiDataCollector) # type: ignore
         if not entry:
-            GuiUtilities.show_warning_msg(msg)
+            GuiUtilities.show_warning_msg(self, msg)
             return
         print()
         print(subject)
         print(entry.to_dict())
         DATA.add_entry(subject, entry.book, entry.to_dict())
-        UnsavedEntries.unsaved_entries.append(entry)
-        GuiUtilities.show_information_msg("Entry successful!")
+        UnsavedEntries.unsaved_entries.update({f"{subject}\n{entry.book}": entry})
+        GuiUtilities.show_information_msg(self, "Entry successful!")
         
 
 class OtherSubjectsForm(EntryFormWidget):
@@ -463,14 +221,8 @@ class OtherSubjectsForm(EntryFormWidget):
         self.qlSubject.setMinimumWidth(155)
 
         self.qcbSubject.currentTextChanged.connect(self.populate_books)
-        self.submit_label.leftClicked.connect(self.submit_form)
+        self.submit_label.leftClicked.connect(self.submit_form) #type: ignore
 
-        StyleUtilities.styleFormElements(self.qlSubject, self.qcbSubject,
-                                    self.qlBook, self.qcbBook,
-                                    self.qlUnit, self.qleUnit1, self.qleUnit2,
-                                    self.qlChapter, self.qleChapter)
-
-        self.setStyleSheet("QComboBox{background-color: white;}")
         self.form_layout.addWidget(self.qlSubject, 0, 0, 1, 1)
         self.form_layout.addWidget(self.qcbSubject, 0, 1, 1, 2)
         self.form_layout.addWidget(self.qlBook, 1, 0, 1, 1)
@@ -512,38 +264,15 @@ class OtherSubjectsForm(EntryFormWidget):
         
     def submit_form(self):
         subject = self.qcbSubject.currentText()        
-        entry, msg = EntryFactory.make_other_entry({"form": self}, GuiDataCollector)
+        entry, msg = EntryFactory.make_other_entry({"form": self}, GuiDataCollector) # type: ignore
         if not entry:
-            GuiUtilities.show_warning_msg(msg)
+            GuiUtilities.show_warning_msg(self, msg)
             return
         print("\n",subject , "\n",entry.to_dict())
         DATA.add_entry(subject, entry.book, entry.to_dict())
-        UnsavedEntries.unsaved_entries.append(entry)
-        GuiUtilities.show_information_msg("Entry successful!")
+        UnsavedEntries.unsaved_entries.update({f"{subject}\n{entry.book}": entry})
+        GuiUtilities.show_information_msg(self, "Entry successful!")
 
-
-class GuiDataCollector:
-    @staticmethod
-    def collect_common_raw_data(form: EntryFormWidget, carrier: DataCarrier):
-        carrier.common_raw_data = form.collect_common_raw_input()
-
-    @classmethod
-    def collect_raw_data(cls, form: EntryFormWidget, carrier: DataCarrier):
-        cls.collect_common_raw_data(form, carrier)
-        carrier.raw_data = form.collect_raw_input()
-
-    @classmethod
-    def collect_Quran_data(cls, carrier: DataCarrier, args: dict):
-        form = args["form"]
-        cls.collect_raw_data(form, carrier)
-        return DataProcessor.process_Quran_data(carrier)
-
-    @classmethod
-    def collect_other_data(cls, carrier: DataCarrier, args: dict):
-        form = args["form"]
-        cls.collect_raw_data(form, carrier)
-        return DataProcessor.process_other_data(carrier)
-        
 
 class MainMenuScreen(QWidget):
 
@@ -564,22 +293,17 @@ class MainMenuScreen(QWidget):
                                self.delete_label, self.exit_label)
 
         # Attaching Functions
-        self.Quran_label.leftClicked.connect(
-            lambda: self.main_window.switch_screens(self.main_window.
-                                                    Quran_Kareem))
-        self.other_label.leftClicked.connect(
-            lambda: self.main_window.switch_screens(self.main_window.
-                                                    other_subjects))
-        self.save_label.leftClicked.connect(
-            lambda: self.main_window.switch_screens(self.main_window.
-                                                    save_screen))
-        self.view_label.leftClicked.connect(
-            lambda: self.main_window.switch_screens(self.main_window.
-                                                    view_screen))
-        self.delete_label.leftClicked.connect(
-            lambda: self.main_window.switch_screens(self.main_window.
-                                                    delete_screen))
-        self.exit_label.leftClicked.connect(self.main_window.quit_program)
+        self.Quran_label.leftClicked.connect( #type: ignore
+            lambda: self.main_window.switch_screens(self.main_window.Quran_Kareem))
+        self.other_label.leftClicked.connect( #type: ignore
+            lambda: self.main_window.switch_screens(self.main_window.other_subjects))
+        self.save_label.leftClicked.connect( #type: ignore
+            lambda: self.main_window.switch_screens(self.main_window.save_screen))
+        self.view_label.leftClicked.connect( #type: ignore
+            lambda: self.main_window.switch_screens(self.main_window.view_screen))
+        self.delete_label.leftClicked.connect( #type: ignore
+            lambda: self.main_window.switch_screens(self.main_window.delete_screen))
+        self.exit_label.leftClicked.connect(self.main_window.quit_program) #type: ignore
 
         self.menu = QGridLayout(self)
         # self.menu.setVerticalSpacing(15)
@@ -591,6 +315,13 @@ class MainMenuScreen(QWidget):
         self.menu.addWidget(self.view_label, 3, 1)
         self.menu.addWidget(self.delete_label, 3, 2)
         self.menu.addWidget(self.exit_label, 4, 0, 1, 3)
+        self.title.setStatusTip("Muslim-learning-Journal")
+        self.Quran_label.setStatusTip("Log Qur'an Progress")
+        self.other_label.setStatusTip("Log other Progress")
+        self.save_label.setStatusTip("Save all changes")
+        self.view_label.setStatusTip("View entries from a specific date")
+        self.delete_label.setStatusTip("Delete entries")
+        self.exit_label.setStatusTip("Exit")
 
 
 class BaseScreen(QWidget):
@@ -620,34 +351,52 @@ class QuranKareemScreen(BaseScreen):
 
         # Quran Tabs
         self.tabs_widget = QTabWidget()
-        self.tabs_widget.addTab(self.Tafseer_form, "Tafseer")
-        self.tabs_widget.addTab(self.Tilawat_form, "Tilawat")
-        self.tabs_widget.setStyleSheet(
-            "QTabBar{font-size: 12pt; font-family: Fira code;}")
+        self.tabs_widget.addTab(self.Tafseer_form, QIcon("./images/Quran.jpg"), "Tafseer")
+        self.tabs_widget.addTab(self.Tilawat_form, QIcon("./images/Quran.jpg"), "Tilawat")
 
         super().__init__("AL Quran Kareem", self.tabs_widget, go_back_label)
 
+
+class EntryDisplay:
+    @staticmethod
+    def format_entry_html(buffer: StringIO, heading: str, entry: dict):
+        buffer.write(f"<h2>{heading}</h2><br>\n<pre align='left'>\n")
+        for key, value in entry.items():
+            buffer.write(f">>> {key}: {value}<br><br>")
+        buffer.write(f"\n</pre><hr><br>")
+
+    @classmethod
+    def format_day_entries_html(cls, date: str, entries: dict):
+        buffer = StringIO()
+        buffer.write(f"<h2>Entries from {date}</h2><br>")
+        for subject, books in entries.items():
+            buffer.write(f"<h2>{subject}<h2>")
+            for book, sessions in books.items():
+                buffer.write(f"<h2>{book}<h2><br>")
+                for session, session_details in sessions.items():
+                    cls.format_entry_html(buffer, session, session_details)
+        return buffer.getvalue() 
+
+
 class UnsavedEntries:
-    unsaved_entries = []
+    unsaved_entries = {}
 
     @classmethod
     def clear_all(cls):
         cls.unsaved_entries.clear()
 
     @classmethod
-    def to_text(cls):
-        if cls.unsaved_entries:
-            lines = [f"Unsaved Entries: {len(cls.unsaved_entries)}\n"]
+    def to_html(cls):
+        if not cls.unsaved_entries:
+            return "<h2>No unsaved entries</h2>"
+        buffer = StringIO()
+        buffer.write(f"<h2>Unsaved Entries: {len(cls.unsaved_entries)}</h2><br>")
 
-            for i, entry in enumerate(cls.unsaved_entries, 1):
-                lines.append(f"Entry no. {i}\n")
-                for key, value in entry.to_dict().items():
-                    lines.append(f"{key}: {value}")
-                lines.append("")  # blank line between entries
+        for i, (key, entry) in enumerate(cls.unsaved_entries.items(), 1):
+            buffer.write(f"<h2>Entry no. {i}<h2><br>")
+            EntryDisplay.format_entry_html(buffer, key, entry.to_dict())
 
-            return "\n".join(lines)
-        else:
-            return "No unsaved entries"
+        return buffer.getvalue()
 
 
 class OtherSubjectsScreen(BaseScreen):
@@ -661,89 +410,188 @@ class SaveScreen(BaseScreen):
         super().__init__("Save Progress", self.content_widget, go_back_label)
 
         self.tb = QTextBrowser()
+        self.tb.setStyleSheet("background: rgb(220, 220, 220);")
         self.save = ClickableLabel("Save")
-        StyleUtilities.styleWidgets(self.save)
-        self.save.leftClicked.connect(self.save_progress)
-        self.layout_ = QVBoxLayout(self.content_widget)
-        self.layout_.addWidget(self.tb)
-        self.layout_.addWidget(self.save)
+        self.save.leftClicked.connect(self.save_progress) #type: ignore
+        layout = QVBoxLayout(self.content_widget)
+        layout.addWidget(self.tb)
+        layout.addWidget(self.save)
 
-        self.tb.setStyleSheet("""
-        QTextBrowser{
-            font-size: 25px;
-            font-family: consolas;
-        }
-        """)
-        self.tb.setAlignment(Qt.AlignCenter)
+        StyleUtilities.styleWidgets(self.save)
 
     def showEvent(self, event):
         super().showEvent(event)
         self.show_unsaved_entries()
 
     def show_unsaved_entries(self):
-        self.tb.setText(UnsavedEntries.to_text())
+        self.tb.setHtml(f"<pre align='center'>{UnsavedEntries.to_html()}</pre>")
 
     def save_progress(self):
         return_code =  DATA.save_progress_to_files()
         if return_code == 0:
-            GuiUtilities.show_information_msg("Progress saved successfully!")
+            GuiUtilities.show_information_msg(self, "Progress saved successfully!")
             UnsavedEntries.clear_all()
             self.show_unsaved_entries()
         elif return_code == 1:
-            GuiUtilities.show_critical_msg("Could not save JSON file.")
+            GuiUtilities.show_critical_msg(self, "Could not save JSON file.")
         elif return_code == 2:
-            GuiUtilities.show_critical_msg("Could not save Markdown file.")
+            GuiUtilities.show_critical_msg(self, "Could not save Markdown file.")
+
+
+class DateSelector(QWidget):
+    dateSelected = pyqtSignal(QDate)
+    def __init__(self, label_text: str ,parent=None) -> None:
+        super().__init__(parent)
+        layout = QHBoxLayout(self)
+        self.date_edit = QDateEdit()
+        self.submit = ClickableLabel(label_text)
+        layout.addWidget(self.submit)
+        layout.addWidget(self.date_edit)
+        StyleUtilities.styleWidgets(self.submit)
+        self.submit.leftClicked.connect(lambda: self.dateSelected.emit(self.date_edit.date())) # type: ignore
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        self.date_edit.setDate(QDate(datetime.today().year, datetime.today().month, datetime.today().day))
 
 
 class ViewScreen(BaseScreen):
     def __init__(self, go_back_label):
-
         self.content_widget = QWidget()
-
         super().__init__("View Progress", self.content_widget, go_back_label)
 
+        layout = QVBoxLayout(self.content_widget)
+        self.date_selector = DateSelector("View Entries from")
+        self.display = QTextBrowser()
+        self.display.setStyleSheet("background: rgb(220, 220, 220);")
+        layout.addWidget(self.date_selector)
+        layout.addWidget(self.display)
+        self.date_selector.dateSelected.connect(self.get_date) # type: ignore
+
+    def get_date(self, date: QDate):
+        formatted = date.toString("dd-MMM-yyyy")
+        self.show_progress(formatted)
+
+    def show_progress(self, date: str):
+        entries = DATA.get_entries_from_date(date)
+        if entries:
+            formatted = EntryDisplay.format_day_entries_html(date, entries)
+            self.display.setHtml(f"<pre align='center'>{formatted}</pre>")
+        else:
+            self.display.setHtml(f"<pre align='center'><h2>No entries found for {date}.<br>Please try another date.</h2></pre>")
+            
 
 class DeleteScreen(BaseScreen):
-
     def __init__(self, go_back_label):
-
         self.content_widget = QWidget()
-
         super().__init__("Delete Progress", self.content_widget, go_back_label)
+        self.stacked_layout = QStackedLayout(self.content_widget)
+
+        self.menu = QWidget()
+        menu_layout = QVBoxLayout(self.menu)
+        self.label = QLabel("Select an option")
+        self.today = QRadioButton(text=DeleteController.DEL_OPTIONS[0])
+        self.another_day = QRadioButton(text=DeleteController.DEL_OPTIONS[1])
+        self.all_progress = QRadioButton(text=DeleteController.DEL_OPTIONS[2])
+        self.button = ClickableLabel("Next")
+        self.button.leftClicked.connect(self.next) # type: ignore
+        menu_layout.addWidget(self.label)
+        menu_layout.addWidget(self.today)
+        menu_layout.addWidget(self.another_day)
+        menu_layout.addWidget(self.all_progress)
+        menu_layout.addWidget(self.button)
+        StyleUtilities.styleWidgets(self.label, self.button)
+
+        self.another_date = QWidget()
+        another_layout = QVBoxLayout(self.another_date)
+        another_label = QLabel("Select the Date")
+        date_selector = DateSelector("Delete Entries from")
+        date_selector.dateSelected.connect(self.get_date) # type: ignore
+        another_layout.addWidget(another_label)
+        another_layout.addWidget(date_selector)
+
+        self.password_screen = QWidget()
+        password_layout = QVBoxLayout(self.password_screen)
+        password_label = QLabel("Enter your password")
+        self.password_edit = QLineEdit()
+        password_submit = ClickableLabel("Submit")
+        password_submit.leftClicked.connect(self.delete_all) # type: ignore
+        password_layout.addWidget(password_label)
+        password_layout.addWidget(self.password_edit)
+        password_layout.addWidget(password_submit)
+        StyleUtilities.styleWidgets(password_label, password_submit, another_label)
+        
+        self.stacked_layout.addWidget(self.menu)
+        self.stacked_layout.addWidget(self.another_date)
+        self.stacked_layout.addWidget(self.password_screen)
+
+    def next(self):
+        if self.today.isChecked():
+            today = DateManager.get_date_today()
+            if GuiUtilities.get_answer(self, "This will delete progress from today.\nContinue?\n", title="Delete Confirmation"):
+                deleted, msg = DeleteController.delete_day(today, DATA)
+                if deleted:
+                    GuiUtilities.show_information_msg(self, msg)
+                else:
+                    GuiUtilities.show_critical_msg(self, msg)
+        elif self.another_day.isChecked():
+            self.stacked_layout.setCurrentWidget(self.another_date)
+        elif self.all_progress.isChecked():
+            self.stacked_layout.setCurrentWidget(self.password_screen)
+
+    def get_date(self, date: QDate):
+        formatted = date.toString("dd-MMM-yyyy")
+        if GuiUtilities.get_answer(self, f"This will delete progress from {formatted}.\nContinue?\n", title="Delete Confirmation"):
+            deleted, msg = DeleteController.delete_day(formatted, DATA)
+            if deleted:
+                GuiUtilities.show_information_msg(self, msg)
+            else:
+                GuiUtilities.show_critical_msg(self, msg)
+        self.stacked_layout.setCurrentWidget(self.menu)
+
+    def delete_all(self):
+        if not GuiUtilities.get_answer(self, f"This will delete all time progress.\nContinue?\n", title="Delete Confirmation"):
+            return
+        password = self.password_edit.text()
+        deleted, msg = DeleteController.delete_all(password, DATA)
+        if deleted:
+            GuiUtilities.show_information_msg(self, msg)            
+        else:
+            GuiUtilities.show_critical_msg(self, msg)
+        self.stacked_layout.setCurrentWidget(self.menu)
 
 
 class PasswordScreen(QWidget):
     def __init__(self, main_window, parent=None):
         super().__init__(parent)
         self.main_window = main_window
-        self.layout = QFormLayout(self)
+        layout = QFormLayout(self)
         self.qlStatus = QLabel("No password has been set. Please set one to continue.")
         self.qlPassword = QLabel("Enter Password:")
         self.qlConfirm = QLabel("Confirm Password:")
         self.qlePassword = QLineEdit()
         self.qleConfirm = QLineEdit()
-        self.qpbSubmit = QPushButton("Submit")
-        self.qpbSubmit.clicked.connect(self.set_password)
+        self.clSubmit = ClickableLabel("Submit")
+        self.clSubmit.leftClicked.connect(self.set_password) # type: ignore
 
-        self.layout.addRow(self.qlStatus)
-        self.layout.addRow(self.qlPassword, self.qlePassword)
-        self.layout.addRow(self.qlConfirm, self.qleConfirm)
-        self.layout.addRow(self.qpbSubmit)
+        layout.addRow(self.qlStatus)
+        layout.addRow(self.qlPassword, self.qlePassword)
+        layout.addRow(self.qlConfirm, self.qleConfirm)
+        layout.addRow(self.clSubmit)
+        StyleUtilities.styleWidgets(self.qlStatus, self.qlPassword, self.qlConfirm, self.clSubmit)
 
     def set_password(self):
-        if self.qlePassword.text().strip() == self.qleConfirm.text().strip():
-            saved, msg = PasswordManager.store_password(self.qlePassword.text().strip())
-            if saved:
-                GuiUtilities.show_information_msg(msg)
-            else:
-                GuiUtilities.show_critical_msg(msg)
-                return
-            self.main_window.go_back()
-            self.main_window.stacked_layout.removeWidget(self)
-            self.deleteLater()
-        else:
-            GuiUtilities.show_critical_msg("Passwords do not match.\nEnter again.")
-
+        if not self.qlePassword.text().strip() == self.qleConfirm.text().strip():
+            GuiUtilities.show_critical_msg(self, "Passwords do not match. Enter again.")
+            return
+        saved, msg = PasswordManager.store_password(self.qlePassword.text().strip())
+        if not saved:
+            GuiUtilities.show_critical_msg(self, msg)
+            return
+        GuiUtilities.show_information_msg(self, msg)
+        self.main_window.go_back()
+        self.main_window.stacked_layout.removeWidget(self)
+        self.deleteLater()
 
 
 class MainWindow(QMainWindow):
@@ -761,8 +609,6 @@ class MainWindow(QMainWindow):
         self.setGeometry(150, 100, 900, 600)
         self.setWindowTitle("Muslim Learning Journal")
         self.setWindowIcon(QIcon("./images/Diary.png"))
-        self.setStyleSheet("QMainWindow { background-color: #F2F2F2;}")
-        # self.showMaximized()
 
         # All Screens
         self.main_menu = MainMenuScreen(self)
@@ -774,10 +620,9 @@ class MainWindow(QMainWindow):
 
         # Central Widget
         central_widget = QWidget()
-        central_widget.setStyleSheet("background: transparent;")
+        central_widget.setStyleSheet("background: #F2F2F2;")
         self.setCentralWidget(central_widget)
         self.stacked_layout = QStackedLayout(central_widget)
-
 
         self.stacked_layout.addWidget(self.main_menu)
         self.stacked_layout.addWidget(self.Quran_Kareem)
@@ -785,8 +630,8 @@ class MainWindow(QMainWindow):
         self.stacked_layout.addWidget(self.save_screen)
         self.stacked_layout.addWidget(self.view_screen)
         self.stacked_layout.addWidget(self.delete_screen)
+        self.setStatusBar(QStatusBar())
         self.setup_password_gate()
-        # self.setStatusBar(QStatusBar())
 
     def switch_screens(self, screen):
         self.stacked_layout.setCurrentWidget(screen)
@@ -796,7 +641,7 @@ class MainWindow(QMainWindow):
 
     def get_back_label(self, label_text="Go Back") -> ClickableLabel:
         go_back_label = ClickableLabel(label_text)
-        go_back_label.leftClicked.connect(self.go_back)
+        go_back_label.leftClicked.connect(self.go_back) #type: ignore
         StyleUtilities.styleWidgets(go_back_label)
         return go_back_label
 
@@ -806,18 +651,14 @@ class MainWindow(QMainWindow):
             self.stacked_layout.addWidget(screen)
             self.switch_screens(screen)
 
-    # Functions
     def quit_program(self):
-        button = QMessageBox.question(self, 'Exit Confirmation',
-                                      "Any unsaved changes will be lost.\nAre you sure you want to exit?",
-                                      QMessageBox.Yes | QMessageBox.No,
-                                      QMessageBox.No)
-        if button == QMessageBox.Yes:
+        if GuiUtilities.get_answer(self, "Any unsaved changes will be lost.\nAre you sure you want to exit?", title="Exit Confirmation"):
             QApplication.quit()
 
 
 def main():
     app = QApplication(sys.argv)
+    StyleUtilities.applyGlobalStyles(app)
     window = MainWindow()
     window.show()
     window.raise_()
