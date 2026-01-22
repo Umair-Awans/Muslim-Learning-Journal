@@ -1,6 +1,6 @@
 from core.data_manager import DataManager
-from core.entries import EntryFactory, DataCarrier
-from core.core_utils import Utilities, ProgressUtils
+from core.entries import TafseerEntry, TilawatEntry, OtherEntry
+from core.core_services import DataCarrier, CoreHelpers, ProgressRules
 from cli.cli_prompt import CliPrompt
 from cli.menu import Menu
 
@@ -12,13 +12,13 @@ class CliEntryPrompts:
                                       max_val=limit)
         last_entry = CliPrompt.validate_number(f"Enter the last {entry} number: ",
                                      start_entry)
-        return ProgressUtils.get_str_and_total(start_entry, last_entry)
+        return ProgressRules.get_str_and_total(start_entry, last_entry)
 
     @staticmethod
     def get_time_spent(book: str):
         mins_spent = CliPrompt.validate_number(
             f"\nEnter the time spent on {book} in this session (in minutes): ")
-        return Utilities.format_time(int(mins_spent))
+        return CoreHelpers.format_time(int(mins_spent))
 
     @staticmethod
     def get_notes():
@@ -50,35 +50,36 @@ class CliDataCollector:
     def __init__(self) -> None:
         self.carrier = DataCarrier()
 
-    def collect_common_data(self, context: dict):
-        self.carrier.common_data["subject"] = context["subject"]
-        self.carrier.common_data["book"] = context["book"]
-        self.carrier.common_data["pages"], self.carrier.common_data["total_pages"] = CliEntryPrompts.get_entry_range("page")
-        self.carrier.common_data["time_spent"] = CliEntryPrompts.get_time_spent(context["book"])
-        self.carrier.common_data["notes"] = CliEntryPrompts.get_notes()
-        self.carrier.common_data["reading_mode"] = CliEntryPrompts.get_reading_mode()
-        self.carrier.common_data["revision"] = CliEntryPrompts.get_revision()    
+    def collect_common_data(self):
+        self.carrier.data_final["pages"], self.carrier.data_final["total_pages"] = CliEntryPrompts.get_entry_range("page")
+        self.carrier.data_final["time_spent"] = CliEntryPrompts.get_time_spent(self.carrier.data_final["book"])
+        self.carrier.data_final["notes"] = CliEntryPrompts.get_notes()
+        self.carrier.data_final["reading_mode"] = CliEntryPrompts.get_reading_mode()
+        self.carrier.data_final["revision"] = CliEntryPrompts.get_revision()    
     
     def collect_Quran_data(self, context: dict):
+        self.carrier.data_final["subject"] = context["subject"]
         Para_number = CliEntryPrompts.get_entry_range("Para", 30)[0]
-        context["book"] = f"Para no. {Para_number}"
+        self.carrier.data_final["book"] = f"Para no. {Para_number}"
         if "Tafseer" in context["subject"]:
-            self.carrier.data["Surah"] = CliEntryPrompts.get_entry_range("Surah", 114)[0]
-            self.carrier.data["Ayah"], self.carrier.data["total_Aayat"] = CliEntryPrompts.get_entry_range("Ayah")
-        self.carrier.data["Ruku"], self.carrier.data["total_Ruku"] = CliEntryPrompts.get_entry_range("Ruku (Para)")
-        self.collect_common_data(context)
+            self.carrier.data_final["Surah"] = CliEntryPrompts.get_entry_range("Surah", 114)[0]
+            self.carrier.data_final["Ayah"], self.carrier.data_final["total_Aayat"] = CliEntryPrompts.get_entry_range("Ayah")
+        self.carrier.data_final["Ruku"], self.carrier.data_final["total_Ruku"] = CliEntryPrompts.get_entry_range("Ruku (Para)")
+        self.collect_common_data()
         return True, ""
     
     def collect_other_data(self, context: dict):
-        self.carrier.data["unit"] = CliEntryPrompts.get_entry_range("unit")[0]
-        self.carrier.data["chapter"] = CliEntryPrompts.get_chapter()
-        self.collect_common_data(context)
+        self.carrier.data_final["subject"] = context["subject"]
+        self.carrier.data_final["book"] = context["book"]
+        self.carrier.data_final["unit"] = CliEntryPrompts.get_entry_range("unit")[0]
+        self.carrier.data_final["chapter"] = CliEntryPrompts.get_chapter()
+        self.collect_common_data()
         return True, ""
 
 
 class CliWorkflow:
     @staticmethod
-    def log_Quran_progress(data: DataManager, method: str = "Tafseer") -> None:
+    def log_Quran_progress(app_context, method: str = "Tafseer") -> None:
         method_full = f"Al-Qur'an ({method})"
         print(f"\n<><><>__( {method_full} )__<><><>")
         while True:
@@ -87,28 +88,33 @@ class CliWorkflow:
             if not valid:
                 print(msg)
                 return
-            entry = EntryFactory.make_Quran_entry(data_collector.carrier)
-            data.add_entry(entry)
+            if "Tafseer" in data_collector.carrier.data_final["subject"]:
+                entry = TafseerEntry(**data_collector.carrier.data_final)
+            else:
+                entry = TilawatEntry(**data_collector.carrier.data_final)
+            app_context.add_entry_to_log(entry)
             if CliPrompt.validate_choice(
                 f"\nDo you want to add another {method_full} entry to the log?", ["Y", "N"]) == "N":
                 return
+            data_collector.carrier.clear_all()
 
     @staticmethod
-    def choose_subject(data: DataManager) -> tuple:
-        if data.all_time_subjects:
+    def choose_subject(data_manager: DataManager) -> tuple:
+        all_subjects = data_manager.get_all_subjects()
+        if all_subjects:
             subjects_list = [
                 "Add a New Subject",
-                *data.all_time_subjects.keys()
+                *all_subjects
             ]
             subjects_menu = Menu(subjects_list, "Select a Subject")
             user_choice = subjects_menu.display_menu(show_exit=False)
             if user_choice != 1:
                 subject = subjects_list[user_choice - 1] # type: ignore
-                return subject, data.all_time_subjects[subject]
+                return subject, data_manager.get_books_list(subject)
         while True:
             subject = input("\nEnter a subject name: ").strip()
             if subject:
-                return (subject, data.all_time_subjects.get(subject))
+                return (subject, data_manager.get_books_list(subject))
             print("\nSubject cannot be blank.")
 
     @staticmethod
@@ -127,8 +133,8 @@ class CliWorkflow:
             print("\nBook title cannot be blank.")
 
     @classmethod
-    def get_and_add_progress(cls, data: DataManager) -> None:
-        subject, books_list = cls.choose_subject(data)
+    def get_and_add_progress(cls, app_context) -> None:
+        subject, books_list = cls.choose_subject(app_context.data_manager)
         print(f"\n<><><>__(<<[ {subject} ]>>)__<><><>\n")
         book = cls.choose_book(subject, books_list)
         print(f"\n<><><>__(<< {book} >>)__<><><>\n")
@@ -137,13 +143,13 @@ class CliWorkflow:
         if not valid:
             print(msg)
             return
-        entry = EntryFactory.make_other_entry(data_collector.carrier)
-        data.add_entry(entry)
+        entry = OtherEntry(**data_collector.carrier.data_final)
+        app_context.add_entry_to_log(entry)
 
     @classmethod
-    def log_other_progress(cls, data: DataManager) -> None:
+    def log_other_progress(cls, app_context) -> None:
         while True:
-            cls.get_and_add_progress(data)
+            cls.get_and_add_progress(app_context)
             if CliPrompt.validate_choice(
                 "\nWould you like to add another entry to today's log?",
                 ["Y", "N"]) == "N":

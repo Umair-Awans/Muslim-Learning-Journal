@@ -2,32 +2,52 @@ import os, hashlib, random
 from datetime import datetime
 
 
+class DataCarrier:
+    def __init__(self):
+        self.common_raw_data: dict = {}
+        self.raw_data: dict = {}
+        self.data_final: dict = {}
+    
+    def clear_all(self):
+        self.common_raw_data.clear()
+        self.raw_data.clear()
+        self.data_final.clear()
+
+
 class PasswordManager:
-    PASSWORD_FILE = './data/password.txt'
+    def __init__(self, path_password_file: str) -> None:
+        self.password_file = path_password_file
 
     @staticmethod
     def hash_password(password: str) -> str:
         return hashlib.sha256(password.encode()).hexdigest()
 
-    @classmethod
-    def password_file_exists(cls) -> bool:
-        return os.path.exists(cls.PASSWORD_FILE)
-
-    @classmethod
-    def store_password(cls, password: str):
+    def store_password(self, password: str):
         try:
-            hashed = cls.hash_password(password)
-            with open(cls.PASSWORD_FILE, "w") as file:
+            hashed = self.hash_password(password)
+            with open(self.password_file, "w") as file:
                 file.write(hashed)
                 return True, "Password has been set and stored securely."
         except IOError as e:
             return False, str(e)
     
-    @classmethod
-    def verify_password(cls, password: str) -> bool:
-        with open(cls.PASSWORD_FILE, 'r') as file:
-            hashed_password = file.read().strip()
-        return cls.hash_password(password) == hashed_password
+    def set_password(self, password: str, confirm_password: str):
+        if len(password) < 6:
+            return False, "Password needs to be at least 6 characters long"
+        if password != confirm_password:
+            return False, "Passwords do not match. Enter again"
+        return self.store_password(password)
+
+    def is_password_set(self) -> bool:
+        return os.path.exists(self.password_file) and os.path.getsize(self.password_file) > 0
+
+    def verify_password(self, password: str) -> bool:
+        try:
+            with open(self.password_file, 'r') as file:
+                hashed_password = file.read().strip()
+            return self.hash_password(password) == hashed_password
+        except Exception:
+            return False
 
 
 class DateManager:
@@ -98,7 +118,7 @@ class DateManager:
         return last_seven_days
 
 
-class Utilities:
+class CoreHelpers:
     @staticmethod
     def get_motivational_quote() -> str:
         quotes = [
@@ -127,6 +147,7 @@ class Utilities:
         dict_stats.setdefault(subject, {}).setdefault(book, {})
         dict_stats[subject][book].setdefault("Pages", 0)
         dict_stats[subject][book].setdefault("Time Spent", "")
+        dict_stats[subject][book].setdefault("Total Entries", 0)
         dict_stats[subject][book].setdefault("Entry Dates", [])    
                 
     @staticmethod
@@ -159,7 +180,7 @@ class Utilities:
         return total_minutes
 
 
-class ProgressUtils:
+class ProgressRules:
     """Backend helpers for progress tracking."""
 
     @staticmethod
@@ -201,11 +222,13 @@ class DeleteController:
     ]
 
     @staticmethod
-    def delete_day(date: str, data_manager):
-        return data_manager.delete_progress(date=date)
+    def delete_day(date: str, context):
+        if date in context.data_manager.entry_log:
+            context.stats_manager.delete_stats(date)
+        return context.data_manager.delete_data(date=date)
 
     @staticmethod
-    def delete_all(password: str, data_manager):
-        if not PasswordManager.verify_password(password):
+    def delete_all_with_password_check(password: str, context):
+        if not context.password_manager.verify_password(password):
             return False, "WRONG PASSWORD!"
-        return data_manager.delete_progress(delete_all=True)
+        return context.data_manager.delete_data(delete_all_progress=True)

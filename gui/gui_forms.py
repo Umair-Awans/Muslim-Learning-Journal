@@ -1,9 +1,13 @@
 from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QIcon, QIntValidator, QDoubleValidator
+from PyQt5.QtGui import QIntValidator, QDoubleValidator
 from PyQt5.QtWidgets import (QWidget, QGridLayout, QCheckBox, QVBoxLayout,
                              QScrollArea, QLabel, QLineEdit,
                              QComboBox, QTextEdit)
-from gui.gui_utils import ClickableLabel, GuiWorkflow, GuiUtilities, StyleUtilities
+from gui.widgets import ClickableLabel
+from gui.dialogs import MsgDialogs
+from gui.styles import StyleSheets
+from gui.gui_workflow import GuiWorkflow
+
 
 class EntryFormWidget(QScrollArea):
     """
@@ -13,10 +17,9 @@ class EntryFormWidget(QScrollArea):
     qcb = QComboBox
     qchb = QCheckBox
     """
-    def __init__(self, data_manager, parent=None):
+    def __init__(self, main_window, parent=None):
         super().__init__(parent)
-        self.data_manager = data_manager
-        self.gui_workflow = GuiWorkflow(data_manager)
+        self.main_window = main_window
 
         self.entry_form_widget = QWidget()
         self.entry_form_layout = QVBoxLayout(self.entry_form_widget)
@@ -37,8 +40,7 @@ class EntryFormWidget(QScrollArea):
         self.submit_label = ClickableLabel("Submit")
         self.submit_label.leftClicked.connect(self.submit_form) #type: ignore
 
-        StyleUtilities.styleWidgets(self.submit_label)
-        StyleUtilities.styleFormElements(self.entry_form_widget)
+        self.setStyleSheet(StyleSheets.form_style_sheet())
 
         self.commons_widget = QWidget()
         self.commons_layout = QGridLayout(self.commons_widget)
@@ -87,17 +89,18 @@ class EntryFormWidget(QScrollArea):
     def submit_form(self):
         specific_input = self.collect_specific_input()
         common_input = self.collect_common_input()
-        valid, msg = self.gui_workflow.collect_data_make_entry(specific_input, common_input)
+        valid, msg = GuiWorkflow.collect_data_make_entry(self.main_window.context, specific_input, common_input)
         if not valid:
-            GuiUtilities.show_warning_msg(self, msg)
+            MsgDialogs.show_warning_msg(self.main_window, msg)
         else:
-            GuiUtilities.show_information_msg(self, msg)
+            MsgDialogs.show_information_msg(self.main_window, msg)
+            self.main_window.main_menu.display_stats_today()
 
     
 class QuranKareemForm(EntryFormWidget):
 
-    def __init__(self, data_manager, Tafseer=True, parent=None):
-        super().__init__(data_manager, parent)
+    def __init__(self, main_window, Tafseer=True, parent=None):
+        super().__init__(main_window, parent)
         self.Tafseer = Tafseer
         self.form_widget = QWidget()
         self.form_layout = QGridLayout(self.form_widget)
@@ -177,8 +180,10 @@ class QuranKareemForm(EntryFormWidget):
            
 
 class OtherSubjectsForm(EntryFormWidget):
-    def __init__(self, data_manager, parent=None):
-        super().__init__(data_manager, parent)
+    def __init__(self, main_window, parent=None):
+        super().__init__(main_window, parent)
+        self.data_manager = main_window.context.data_manager
+
         self.form_widget = QWidget()
         self.form_layout = QGridLayout(self.form_widget)
         
@@ -198,7 +203,6 @@ class OtherSubjectsForm(EntryFormWidget):
         self.qlSubject.setMinimumWidth(155)
 
         self.qcbSubject.currentTextChanged.connect(self.populate_books)
-        self.submit_label.leftClicked.connect(self.submit_form) #type: ignore
 
         self.form_layout.addWidget(self.qlSubject, 0, 0, 1, 1)
         self.form_layout.addWidget(self.qcbSubject, 0, 1, 1, 2)
@@ -212,13 +216,12 @@ class OtherSubjectsForm(EntryFormWidget):
         self.populate_combo_boxes()
 
     def populate_combo_boxes(self):
-        self.subjects = self.data_manager.all_time_subjects
-        self.qcbSubject.addItems(self.subjects.keys())
+        self.qcbSubject.addItems(self.data_manager.get_all_subjects())
         self.populate_books()
     
     def populate_books(self):
         subject = self.qcbSubject.currentText().strip()
-        books_list = self.subjects.get(subject, [])
+        books_list = self.data_manager.get_books_list(subject)
         self.qcbBook.clear()
         self.qcbBook.addItems(books_list)
 

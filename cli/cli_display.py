@@ -1,31 +1,3 @@
-from core.stats_manager import StatsManager
-
-class StatsDisplay:
-    @staticmethod
-    def display_plot(stats: StatsManager):
-        if not hasattr(stats, "weekly_total_time"):
-            stats.compute_weekly_stats()
-        print("\nLoading the plot. Please wait.....")
-        import matplotlib.pyplot as plt
-        title = "Weekly Report"
-        plt.style.use('seaborn')
-        fig, ax = plt.subplots(figsize=(6, 4))
-        ax.plot(stats.weekly_dates, stats.weekly_minutes_spent, linewidth=3, marker='o', label='Minutes Spent')
-        ax.plot(stats.weekly_dates, stats.weekly_pages_read, linewidth=3, marker='o', label='Pages Read')
-        ax.legend()
-        ax.set_title(f"{title} (Total Time: {stats.weekly_total_time})", fontsize=15)
-        ax.set_xlabel("Date", fontsize=14)
-        ax.set_ylabel("Minutes / Pages", fontsize=14)
-        ax.tick_params(axis='both', labelsize=10)
-        fig.autofmt_xdate()
-        
-        plt.tight_layout()
-        plt.show(block=False)
-        plt.pause(0.001)
-
-    @staticmethod
-    def show_weekly_stats(stats: StatsManager):
-        print(stats.get_weekly_summary())
         
     
 class CliProgressDisplay:

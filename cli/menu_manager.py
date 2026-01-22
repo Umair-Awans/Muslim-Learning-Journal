@@ -2,25 +2,24 @@ import sys
 from copy import deepcopy
 from core.app_context import AppContext
 from core.data_manager import DataManager
-from core.core_utils import (DateManager, Utilities, DeleteController)
-from core.stats_manager import StatsManager
+from core.core_services import (DateManager, CoreHelpers, DeleteController)
 from core.exceptions import DataCorruptionError
 from cli.cli_workflow import CliWorkflow
 from cli.cli_prompt import CliPrompt
 from cli.cli_editor import CliProgressEditor
-from cli.cli_display import CliProgressDisplay, StatsDisplay
+from cli.cli_display import CliProgressDisplay
 from cli.menu import Menu
 
 class Menus:
     @classmethod
-    def save_progress(cls, data_manager: DataManager):
-        return_code =  data_manager.save_progress_to_files()
+    def save_progress(cls, context: AppContext):
+        return_code =  context.save_progress_to_files()
         if return_code == 0:
             print("\nProgress saved successfully!")
         elif return_code == 1:
-            print("\nCould not save JSON file.")
+            print("\nERROR! Could not save JSON file.")
         elif return_code == 2:
-            print("\nCould not save Markdown file.")
+            print("\nERROR! Could not save Markdown file.")
 
     @staticmethod
     def edit_progress_menu(data_manager: DataManager) -> None:
@@ -38,8 +37,7 @@ class Menus:
             CliProgressEditor.edit_progress(progress_copy, data_manager, date)
             data_manager.update_entry_log(date, progress_copy)
         else:
-            print(
-                f"No entries found for {'today' if date_opt == 1 else date}.")
+            print(f"No entries found for {'today' if date_opt == 1 else date}.")
 
     @staticmethod
     def view_progress_menu(data_manager: DataManager) -> None:
@@ -61,7 +59,7 @@ class Menus:
             )
     
     @staticmethod
-    def delete_progress_menu(data_manager: DataManager) -> None:
+    def delete_progress_menu(context: AppContext) -> None:
         what_to_del = CliPrompt.validate_number(
             f"\nDelete Options:\n\n1. {DeleteController.DEL_OPTIONS[0]}\n2. {DeleteController.DEL_OPTIONS[1]}\n3. {DeleteController.DEL_OPTIONS[2]}\n\nYour choice: ",
             1, 3)
@@ -71,13 +69,13 @@ class Menus:
             return
         if what_to_del == 1:
             today = DateManager.get_date_today()
-            print(DeleteController.delete_day(today, data_manager)[1])
+            print(DeleteController.delete_day(today, context)[1])
         elif what_to_del == 2:
             date = CliPrompt.get_date_from_user()
-            print(DeleteController.delete_day(date, data_manager)[1])
+            print(DeleteController.delete_day(date, context)[1])
         else:
             password = input("\nEnter Your Password: ").strip()
-            print(DeleteController.delete_all(password, data_manager)[1])
+            print(DeleteController.delete_all_with_password_check(password, context)[1])
 
     @staticmethod
     def exit_program(data_manager: DataManager) -> bool:
@@ -86,7 +84,7 @@ class Menus:
             ["Y", "N"])
         if confirmation == "Y":
             if not "Al-Qur'an (Tafseer)" in data_manager.progress_today:
-                print(Utilities.get_motivational_quote())
+                print(CoreHelpers.get_motivational_quote())
             if not data_manager.progress_today:
                 print("\nNo progress today! Another day wasted.\n")
             else:
@@ -94,16 +92,11 @@ class Menus:
         return confirmation == "Y"
 
     @classmethod
-    def main_menu(cls) -> None:
+    def main_menu(cls, context: AppContext) -> None:
         print("\n<><><>__( Muslim Learning Journal )__<><><>\n")
-        try:
-            context = AppContext()
-        except DataCorruptionError as e:
-            print(f"ERROR: Data file is corrupted.\nThe application cannot continue.\nDetails: {e}")
-            sys.exit(1)
-        StatsDisplay.show_weekly_stats(context.stats_manager)
-        context.stats_manager.build_subjects_cache()
-        context.stats_manager.calculate_stats()
+                
+        print("\n-------------( Weekly Report )-------------\n")
+        print(context.stats_manager.get_weekly_summary())
         
         MENU_ITEMS = [
             "Al-Qur'an (Tafseer)", "Al-Qur'an (Tilawat)", "Log Other Subjects",
@@ -117,18 +110,33 @@ class Menus:
                 if cls.exit_program(context.data_manager):
                     return
             elif user_choice == 1:
-                CliWorkflow.log_Quran_progress(context.data_manager)
+                CliWorkflow.log_Quran_progress(context)
             elif user_choice == 2:
-                CliWorkflow.log_Quran_progress(context.data_manager, "Tilawat")
+                CliWorkflow.log_Quran_progress(context, "Tilawat")
             elif user_choice == 3:
-                CliWorkflow.log_other_progress(context.data_manager)
+                CliWorkflow.log_other_progress(context)
             elif user_choice == 4:
-                cls.save_progress(context.data_manager)
+                cls.save_progress(context)
             elif user_choice == 5:
                 cls.view_progress_menu(context.data_manager)
             elif user_choice == 6:
                 cls.edit_progress_menu(context.data_manager)
             elif user_choice == 7:
-                cls.delete_progress_menu(context.data_manager)
+                cls.delete_progress_menu(context)
             elif user_choice == 8:
-                StatsDisplay.display_plot(context.stats_manager)
+                print("\nLoading the plot. Please wait.....")
+                context.stats_manager.display_plot_weekly()
+
+
+def main():
+
+    try:
+        context = AppContext()
+    except DataCorruptionError as e:
+        print(f"ERROR:\n{e}\n\nDetails: {e.__cause__}")
+        sys.exit(1)
+
+    if not context.password_manager.is_password_set():
+        CliPrompt.get_and_set_password(context.password_manager)
+        
+    Menus.main_menu(context)

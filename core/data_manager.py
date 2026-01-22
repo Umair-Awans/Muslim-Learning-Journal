@@ -1,5 +1,6 @@
 import json
-from core.core_utils import DateManager, Utilities
+from core.core_services import DateManager, CoreHelpers
+from core.progress_editor import ProgressEditor
 from core.entries import CommonEntry
 from core.exceptions import DataCorruptionError
 
@@ -13,7 +14,7 @@ class FileManager:
         except (FileNotFoundError):
             return {}
         except json.JSONDecodeError as e:
-            raise DataCorruptionError(f"Data file is corrupted: {file_path_json}") from e
+            raise DataCorruptionError(file_path=file_path_json) from e
 
     @staticmethod
     def save_to_md(dict_entries: dict, file_path_md: str) -> bool:
@@ -58,9 +59,9 @@ class FileManager:
 
 
 class DataManager:
-    def __init__(self) -> None:
-        self.__FILE_JSON = "./data/learning_data.json"
-        self.FILE_MD = "./data/Journal.md"
+    def __init__(self, path_json: str, path_md: str) -> None:
+        self.__FILE_JSON = path_json
+        self.FILE_MD = path_md
         self.data = FileManager.load_file(self.__FILE_JSON)
         self.entry_log = self.data.get("Entry Log", {})
         self.all_time_subjects = self.data.get("All Time Subjects", {})
@@ -70,10 +71,10 @@ class DataManager:
     @property
     def file_dict(self) -> dict:
         return {
-                    "Entry Log": self.entry_log,
-                    "All Time Subjects": self.all_time_subjects,
-                    "Statistics": self.stats
-                }
+                "Entry Log": self.entry_log,
+                "All Time Subjects": self.all_time_subjects,
+                "Statistics": self.stats
+            }
 
     def update_date_today(self):
         self.date_today = DateManager.get_date_today()
@@ -87,33 +88,7 @@ class DataManager:
         entry_time = f"Entry {DateManager.get_current_time()}"
         self.progress_today.setdefault(entry.subject, {}).setdefault(entry.book, {})
         self.progress_today[entry.subject][entry.book][entry_time] = entry.to_dict()
-        self.add_to_cache(entry.subject, entry.book)
-        self.add_stats(entry.subject, entry.book, entry.to_dict())
         self.update_entry_log("", {})
-
-    def add_to_cache(self, subject, book_name):
-        if subject in ["Al-Qur'an (Tafseer)", "Al-Qur'an (Tilawat)"]:
-            return
-        self.all_time_subjects.setdefault(subject, [])
-        self.all_time_subjects = Utilities.dict_sort(self.all_time_subjects)
-        if book_name not in self.all_time_subjects[subject]:
-            self.all_time_subjects[subject].append(book_name)
-            self.all_time_subjects[subject].sort()
-
-    def add_stats(self, subject, book_name, entry_dict: dict):
-        Utilities.set_defaults_for_stats(self.stats, subject, book_name)
-        self.stats = Utilities.dict_sort(self.stats)
-        self.stats[subject] = Utilities.dict_sort(self.stats[subject])
-
-        if self.date_today not in self.stats[subject][book_name]["Entry Dates"]:
-            self.stats[subject][book_name]["Entry Dates"].append(self.date_today)
-            
-        self.stats[subject][book_name]["Pages"] += entry_dict["Total Pages"]
-
-        all_time_minutes = Utilities.convert_time_to_mins(self.stats[subject][book_name]["Time Spent"])
-        entry_minutes = Utilities.convert_time_to_mins(entry_dict["Time Spent"])
-        self.stats[subject][book_name]["Time Spent"] = Utilities.format_time(all_time_minutes + entry_minutes)
-
 
     def update_cache(self, cache: dict) -> None:
         self.all_time_subjects = cache
@@ -128,35 +103,32 @@ class DataManager:
             self.entry_log[date] = entries
         elif date in self.entry_log and not self.entry_log[date]:
             self.entry_log.pop(date)
+    
+    def get_books_list(self, subject: str):
+        return self.all_time_subjects.get(subject, [])
+
+    def get_all_subjects(self):
+        return self.all_time_subjects.keys()
 
     def get_entries_from_date(self, date: str):
         return self.entry_log.get(date, {})
-
-    def delete_stats(self, day: str):
-        from cli.cli_editor import CliProgressEditor
-        for subject, subject_entries in self.entry_log[day].items():
-            for book, book_entries in subject_entries.items():
-                if day in self.stats[subject][book]["Entry Dates"]:
-                    self.stats[subject][book]["Entry Dates"].remove(day)
-                    for entry_details in book_entries.values():
-                        CliProgressEditor.update_entry_pages((subject, book), entry_details["Total Pages"], self.stats)
-                        CliProgressEditor.update_entry_minutes((subject, book), entry_details["Time Spent"], self.stats)
                     
-    def delete_progress(self, date: str = "None", delete_all: bool = False):
-        if delete_all:
+    def delete_data(self, date: str = "None", delete_all_progress: bool = False):
+        """"This method is not to be used directly. Use DeleteController's methods to access this."""
+
+        if delete_all_progress:
             self.entry_log.clear()
             self.stats.clear()
             return True, "All data deleted successfully!"
         elif date in self.entry_log:
-            self.delete_stats(date)
             self.entry_log.pop(date)
-            return True, f"All entries from {date if date != DateManager.get_date_today() else f'today ({date})'} deleted successfully!"
-        return False, f"No entries recorded for {date if date != DateManager.get_date_today() else f'today ({date})'}."
+            return True, f"All entries from {date if date != self.date_today else f'today ({date})'} deleted successfully!"
+            
+        return False, f"No entries recorded for {date if date != self.date_today else f'today ({date})'}."
         
-    def save_progress_to_files(self):
+    def save_data_to_files(self) -> int:
         if not FileManager.save_to_json(self.file_dict, self.__FILE_JSON):
             return 1
         if not FileManager.save_to_md(self.entry_log, self.FILE_MD):
             return 2
         return 0
-

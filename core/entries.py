@@ -2,29 +2,6 @@ from unittest.mock import patch
 from dataclasses import dataclass
 
 
-class DataCarrier:
-    def __init__(self):
-        self.common_raw_data: dict = {}
-        self.raw_data: dict = {}
-        self.common_data: dict = {}
-        self.data: dict = {}
-
-
-class EntryFactory:
-    """Uses a DataCollector instance to gather and store data, then creates and returns an entry object."""
-    
-    @staticmethod
-    def make_Quran_entry(carrier: DataCarrier):
-        if "Tafseer" in carrier.common_data["subject"]:
-            return TafseerEntry(**carrier.common_data, **carrier.data)
-        else:
-            return TilawatEntry(**carrier.common_data, **carrier.data)
-            
-    @staticmethod
-    def make_other_entry(carrier: DataCarrier):
-        return OtherEntry(**carrier.common_data, **carrier.data)
-
-
 @dataclass
 class CommonEntry:
     subject: str

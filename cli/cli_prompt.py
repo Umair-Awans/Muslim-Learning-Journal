@@ -1,5 +1,5 @@
 from typing import List, Union, Optional
-from core.core_utils import DateManager
+from core.core_services import DateManager
 
 class CliPrompt:
     """Provides methods to gather and validate data from the user via the command line."""
@@ -161,14 +161,15 @@ class CliPrompt:
         return f"{day}-{month}-{year}"
 
     @staticmethod
-    def get_password():
+    def get_and_set_password(password_manager):
         print("\nNo password has been set. Please set one to continue.")
         while True:
             password = input("\nEnter your password: ").strip()
             confirm = input("\nConfirm your password: ").strip()
-            if password == confirm:
-                return password
-            print("\nPasswords did not match. Enter again.")
+            saved, msg = password_manager.set_password(password, confirm)
+            print(f"\n{msg}")
+            if saved:
+                break
 
     @staticmethod
     def choose_key(progress: dict, key: str) -> str:
