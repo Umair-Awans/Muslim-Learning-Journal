@@ -19,8 +19,8 @@ class AppContext:
         self.password_manager = PasswordManager(self.path_password_file)
         self.unsaved_entries = {}
 
-        self.stats_manager.build_subjects_cache()
-        self.stats_manager.calculate_stats()
+        self.stats_manager.cache_builder.build_subjects_cache()
+        self.stats_manager.aggregator.calculate_all_time_stats()
     
     def add_entry_to_log(self, entry):
         self.data_manager.add_entry(entry)
@@ -54,3 +54,7 @@ class AppContext:
         if not path.exists():
             raise FileNotFoundError("Journal file not found")
         os.startfile(path)
+
+    def change_path_md(self, file_path):
+        self.path_md = file_path
+        return self.data_manager.save_md_as(file_path)

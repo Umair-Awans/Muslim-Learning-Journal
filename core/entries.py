@@ -1,6 +1,6 @@
 from unittest.mock import patch
 from dataclasses import dataclass
-
+from core.core_services import CoreHelpers
 
 @dataclass
 class CommonEntry:
@@ -26,6 +26,20 @@ class CommonEntry:
             "Revision": self.revision
         }
 
+    def to_form_dict(self) -> dict:
+        minutes = CoreHelpers.convert_time_to_mins(self.time_spent)
+        form_dict = {
+        "subject": self.subject,
+        "book": self.book,
+        "hours": str(minutes // 60) if (minutes // 60) else "",
+        "minutes": str(minutes % 60) if (minutes % 60) else "",
+        "notes": self.notes,
+        "revision": self.revision,
+        "reading_mode": self.reading_mode == "Sequential"
+        }
+        CoreHelpers.split_pair_fields(form_dict, self.pages, "page")
+        return form_dict
+    
     @classmethod
     def from_dict(cls, subject: str, book: str, data: dict, child_entries: tuple):
         return cls(
@@ -39,7 +53,7 @@ class CommonEntry:
             data.get("Revision", 'N/A'),
             *child_entries
         )
-
+        
 
 @dataclass
 class TilawatEntry(CommonEntry):
@@ -51,10 +65,17 @@ class TilawatEntry(CommonEntry):
         data.update(super().to_dict())
         return data
 
+    def to_form_dict(self) -> dict:
+        form_dict = super().to_form_dict()
+        Para = self.book.split("Para no.")[1]
+        CoreHelpers.split_pair_fields(form_dict, Para, "Para")
+        CoreHelpers.split_pair_fields(form_dict, self.Ruku, "Ruku (Para)")
+        return form_dict
+
     @classmethod
     def from_dict(cls, subject: str, book: str, data: dict, child_entries: tuple = ()):
         return super().from_dict(subject, book, data, (data.get("Ruku (Para)", "0"), data.get("Total Ruku", 0)) + child_entries)
-        
+
 
 @dataclass
 class TafseerEntry(TilawatEntry):
@@ -71,6 +92,12 @@ class TafseerEntry(TilawatEntry):
         data.update(super().to_dict())
         return data
 
+    def to_form_dict(self) -> dict:
+        form_dict = super().to_form_dict()
+        CoreHelpers.split_pair_fields(form_dict, self.Surah, "Surah")
+        CoreHelpers.split_pair_fields(form_dict, self.Ayah, "Ayah")
+        return form_dict
+
     @classmethod
     def from_dict(cls, subject: str, book: str, data: dict):
         return super().from_dict(subject, book, data, (data.get("Surah", "0"), data.get("Ayah", "0"), data.get("Total Aayat", 0)))
@@ -85,6 +112,12 @@ class OtherEntry(CommonEntry):
         data = {"Book": self.book, "Unit": self.unit, "Chapter": self.chapter}
         data.update(super().to_dict())
         return data
+
+    def to_form_dict(self) -> dict:
+        form_dict = super().to_form_dict()
+        form_dict["chapter"] = self.chapter
+        CoreHelpers.split_pair_fields(form_dict, self.unit, "unit")
+        return form_dict
 
     @classmethod
     def from_dict(cls, subject: str, book: str, data: dict):

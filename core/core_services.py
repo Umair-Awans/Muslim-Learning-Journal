@@ -51,6 +51,11 @@ class PasswordManager:
 
 
 class DateManager:
+
+    @staticmethod
+    def get_timestamp() -> str:
+        return datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
+
     @staticmethod
     def get_day_today() -> str:
         return datetime.today().strftime("%A")
@@ -149,6 +154,13 @@ class CoreHelpers:
         dict_stats[subject][book].setdefault("Time Spent", "")
         dict_stats[subject][book].setdefault("Total Entries", 0)
         dict_stats[subject][book].setdefault("Entry Dates", [])    
+    
+    @staticmethod
+    def split_pair_fields(entry, formatted_string: str, field: str):
+        numbers_string = formatted_string.split(" - ")
+        entry[f"{field}_from"] = numbers_string[0]
+        if len(numbers_string) > 1:
+            entry[f"{field}_to"] = numbers_string[1]
                 
     @staticmethod
     def get_time_str(hours, minutes) -> str:
@@ -224,7 +236,7 @@ class DeleteController:
     @staticmethod
     def delete_day(date: str, context):
         if date in context.data_manager.entry_log:
-            context.stats_manager.delete_stats(date)
+            context.stats_manager.updater.delete_stats(context.data_manager, date)
         return context.data_manager.delete_data(date=date)
 
     @staticmethod

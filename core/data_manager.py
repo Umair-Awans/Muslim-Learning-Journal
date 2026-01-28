@@ -1,6 +1,5 @@
-import json
-from core.core_services import DateManager, CoreHelpers
-from core.progress_editor import ProgressEditor
+import os, json, zipfile
+from core.core_services import DateManager
 from core.entries import CommonEntry
 from core.exceptions import DataCorruptionError
 
@@ -17,7 +16,7 @@ class FileManager:
             raise DataCorruptionError(file_path=file_path_json) from e
 
     @staticmethod
-    def save_to_md(dict_entries: dict, file_path_md: str) -> bool:
+    def save_to_md(dict_entries: dict, file_path_md: str):
         """
         Save learning entries to a Markdown file with formatted sections for Qur'an and other subjects.
 
@@ -44,28 +43,26 @@ class FileManager:
 
                         # Add daily summary if needed
                         file.write("---\n\n")  # Horizontal rule for separation between dates
-            return True
-        except Exception:
-            return False
+            return True, "Saved successfully"
+        except Exception as e:
+            return False, str(e)
 
     @staticmethod
-    def save_to_json(dict_: dict, file_path_json: str) -> bool:
+    def save_to_json(dict_: dict, file_path_json: str):
         try:
             with open(file_path_json, 'w', encoding="utf-8") as file:
                 json.dump(dict_, file, indent=4, ensure_ascii=False)
-            return True
-        except Exception:
-            return False
+            return True, "Saved successfully"
+        except Exception as e:
+            return False, str(e)
 
 
 class DataManager:
     def __init__(self, path_json: str, path_md: str) -> None:
-        self.__FILE_JSON = path_json
-        self.FILE_MD = path_md
-        self.data = FileManager.load_file(self.__FILE_JSON)
-        self.entry_log = self.data.get("Entry Log", {})
-        self.all_time_subjects = self.data.get("All Time Subjects", {})
-        self.stats = self.data.get("Statistics", {})
+        self._path_json = path_json
+        self.path_md = path_md
+        self.data = FileManager.load_file(self._path_json)
+        self.extract_data()
         self.sync_data_today()
 
     @property
@@ -75,6 +72,11 @@ class DataManager:
                 "All Time Subjects": self.all_time_subjects,
                 "Statistics": self.stats
             }
+    
+    def extract_data(self):
+        self.entry_log = self.data.get("Entry Log", {})
+        self.all_time_subjects = self.data.get("All Time Subjects", {})
+        self.stats = self.data.get("Statistics", {})
 
     def update_date_today(self):
         self.date_today = DateManager.get_date_today()
@@ -127,8 +129,40 @@ class DataManager:
         return False, f"No entries recorded for {date if date != self.date_today else f'today ({date})'}."
         
     def save_data_to_files(self) -> int:
-        if not FileManager.save_to_json(self.file_dict, self.__FILE_JSON):
+        if not FileManager.save_to_json(self.file_dict, self._path_json)[0]:
             return 1
-        if not FileManager.save_to_md(self.entry_log, self.FILE_MD):
+        if not FileManager.save_to_md(self.entry_log, self.path_md)[0]:
             return 2
         return 0
+
+    def save_md_as(self, file_path: str):
+        self.path_md = file_path
+        FileManager.save_to_json(self.file_dict, self._path_json)
+        return FileManager.save_to_md(self.entry_log, self.path_md)
+
+    def backup_data(self, backup_dir: str):
+        path_backup = os.path.join(backup_dir, f"learning_backup_{DateManager.get_timestamp()}.zip")
+        try:
+            with zipfile.ZipFile(path_backup, "w", zipfile.ZIP_DEFLATED) as zipf:
+                zipf.write(self._path_json, arcname="learning_data.json")
+        except OSError as e:
+            return False, f"Backup failed: {e}"
+        return True, "Backup successful!"
+
+    def restore_data(self, zip_path: str) -> tuple:
+        try:
+            with zipfile.ZipFile(zip_path, "r") as zipf:
+                data_bytes = zipf.read("learning_data.json")
+                data = json.loads(data_bytes.decode("utf-8"))
+                if not data: 
+                    return False, "Backup file is empty."
+                self.data = data
+                self.extract_data()
+        except zipfile.BadZipFile as e:
+            return False, f"Invalid ZIP file: {e}"
+        except (KeyError, OSError) as e:
+            return False, "Backup archive does not contain valid data."
+        except json.JSONDecodeError as e:
+            return False, f"Data Corrupted: {e}"
+        return True, "Restoration successful!"
+

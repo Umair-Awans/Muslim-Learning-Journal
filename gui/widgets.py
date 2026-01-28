@@ -31,10 +31,11 @@ class ClickableLabel(QLabel):
 
 class DateSelector(QWidget):
     signal_date_selection = pyqtSignal(QDate)
-    def __init__(self, label_text: str, parent=None) -> None:
+    def __init__(self, label_text: str = "OK", parent=None) -> None:
         super().__init__(parent)
         layout = QHBoxLayout(self)
         self.date_edit = QDateEdit()
+        self.date_edit.setFixedWidth(self.parent().width() / 2)
         self.submit = ClickableLabel(label_text)
         layout.addWidget(self.submit)
         layout.addWidget(self.date_edit)

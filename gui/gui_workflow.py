@@ -130,23 +130,27 @@ class GuiDataProcessor:
 
 
 class GuiWorkflow:
-    @staticmethod
-    def collect_data_make_entry(app_context, specific_input: dict, common_input: dict):
-        carrier = DataCarrier()
-        carrier.raw_data = specific_input
-        carrier.common_raw_data = common_input
+    def __init__(self, app_context) -> None:
+        self.app_context = app_context
+        self.carrier = DataCarrier()
+        self.entry = None
+        
+    def collect_data_make_entry(self, specific_input: dict, common_input: dict, add_entry: bool = True):
+        self.carrier.raw_data = specific_input
+        self.carrier.common_raw_data = common_input
         if "Al Qur'an" in specific_input["entry_type"]:
-            valid, msg = GuiDataProcessor.process_Quran_data(carrier)
+            valid, msg = GuiDataProcessor.process_Quran_data(self.carrier)
             if not valid:
                 return valid, msg
-            if "Tafseer" in carrier.data_final["subject"]:
-                entry = TafseerEntry(**carrier.data_final)
+            if "Tafseer" in self.carrier.data_final["subject"]:
+                self.entry = TafseerEntry(**self.carrier.data_final)
             else:
-                entry = TilawatEntry(**carrier.data_final)
+                self.entry = TilawatEntry(**self.carrier.data_final)
         else:
-            valid, msg = GuiDataProcessor.process_other_data(carrier)
+            valid, msg = GuiDataProcessor.process_other_data(self.carrier)
             if not valid:
                 return valid, msg
-            entry = OtherEntry(**carrier.data_final)
-        app_context.add_entry_to_log(entry)
-        return True, "Entry successful!"
+            self.entry = OtherEntry(**self.carrier.data_final)
+        if add_entry:
+            self.app_context.add_entry_to_log(self.entry)
+        return True, "Operation successful!"

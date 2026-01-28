@@ -45,6 +45,7 @@ class StyleSheets:
         font-family: Consolas, Arial;
         padding: 10px;
         """
+        
     @staticmethod
     def form_style_sheet():
         return ("""
@@ -86,5 +87,8 @@ class StyleSheets:
             max-width: 250px;
             font-size: 30px;
             qproperty-alignment: 'AlignCenter';
+        }
+        QPushButton{
+            font-size: 12px;
         }        
         """)

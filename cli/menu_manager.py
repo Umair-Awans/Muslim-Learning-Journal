@@ -2,7 +2,8 @@ import sys
 from copy import deepcopy
 from core.app_context import AppContext
 from core.data_manager import DataManager
-from core.core_services import (DateManager, CoreHelpers, DeleteController)
+from core.core_services import DateManager, CoreHelpers
+from core.core_services import DeleteController
 from core.exceptions import DataCorruptionError
 from cli.cli_workflow import CliWorkflow
 from cli.cli_prompt import CliPrompt
@@ -22,7 +23,7 @@ class Menus:
             print("\nERROR! Could not save Markdown file.")
 
     @staticmethod
-    def edit_progress_menu(data_manager: DataManager) -> None:
+    def edit_progress_menu(context) -> None:
         date_opt = int(
             CliPrompt.validate_number(
                 "\nWould you like to edit today's entries or previous entries?\n1. Today's entries\n2. Previous entries\n\nYour choice: ",
@@ -32,10 +33,10 @@ class Menus:
         else:
             print("\nEnter the date you wish to edit entries for:")
             date = CliPrompt.get_date_from_user()
-        if date in data_manager.entry_log:
-            progress_copy = deepcopy(data_manager.entry_log[date])
-            CliProgressEditor.edit_progress(progress_copy, data_manager, date)
-            data_manager.update_entry_log(date, progress_copy)
+        if date in context.data_manager.entry_log:
+            progress_copy = deepcopy(context.data_manager.get_entries_from_date(date))
+            CliProgressEditor.select_and_edit_entry(progress_copy, context, date)
+            context.data_manager.update_entry_log(date, progress_copy)
         else:
             print(f"No entries found for {'today' if date_opt == 1 else date}.")
 
@@ -96,7 +97,7 @@ class Menus:
         print("\n<><><>__( Muslim Learning Journal )__<><><>\n")
                 
         print("\n-------------( Weekly Report )-------------\n")
-        print(context.stats_manager.get_weekly_summary())
+        print(context.stats_manager.weekly_stats.get_weekly_summary())
         
         MENU_ITEMS = [
             "Al-Qur'an (Tafseer)", "Al-Qur'an (Tilawat)", "Log Other Subjects",
@@ -120,12 +121,12 @@ class Menus:
             elif user_choice == 5:
                 cls.view_progress_menu(context.data_manager)
             elif user_choice == 6:
-                cls.edit_progress_menu(context.data_manager)
+                cls.edit_progress_menu(context)
             elif user_choice == 7:
                 cls.delete_progress_menu(context)
             elif user_choice == 8:
                 print("\nLoading the plot. Please wait.....")
-                context.stats_manager.display_plot_weekly()
+                context.stats_manager.plotter.display_plot_weekly()
 
 
 def main():

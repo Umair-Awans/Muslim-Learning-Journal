@@ -1,5 +1,3 @@
-from copy import deepcopy
-from core.data_manager import DataManager
 from core.entries import TafseerEntry, TilawatEntry, OtherEntry
 from core.progress_editor import ProgressEditor
 from cli.menu import Menu
@@ -29,25 +27,36 @@ class CliEntryEditor:
 
             
 class CliProgressEditor:
+    @staticmethod
+    def get_value(entry, field):
+        if field == "Page":
+            return entry.total_pages
+        elif field == "Time Spent":
+            return entry.time_spent
+
     @classmethod
-    def edit_subject(cls, details: tuple, editable_entries: list, entry_instance, data: DataManager):
-        editor = CliEntryEditor(entry=entry_instance)
+    def edit_progress(cls, context, details: tuple, editable_entries: list, entry):
         entries_menu = Menu(editable_entries, details[2])
+        editor = CliEntryEditor(entry=entry)
         while True:
             user_choice, exit_option = entries_menu.display_menu() # type: ignore
             if user_choice == exit_option:
                 return
             field = editable_entries[user_choice - 1]
             if field in ["Page", "Time Spent"]:
-                stats = deepcopy(data.stats)
-                ProgressEditor.update_stats(details, editor, stats, field)
-                data.update_stats(stats)
+                old_val = cls.get_value(entry, field)
+                editor.edit_field(field)
+                new_val = cls.get_value(entry, field)
+                if old_val != new_val:
+                    values = (old_val, new_val)
+                    context.stats_manager.updater.update_stats(details, values, field)
             else:
                 editor.edit_field(field)
             print(f"\n{field} updated!\n")
+
         
     @classmethod
-    def edit_progress(cls, progress: dict, data: DataManager, date: str) -> None:
+    def select_and_edit_entry(cls, progress: dict, context, date: str) -> None:
         while True:
             if not progress:
                 print("\nNo progress to edit.")
@@ -78,15 +87,15 @@ class CliProgressEditor:
             details = (subject, book_name, session)
             if next_choice == 1:
                 editable_entries = [e for e in dict_to_edit if e not in ["Book", "Total Pages", "Total Aayat", "Total Ruku"]]
-                cls.edit_subject(details, editable_entries, entry_instance, data)
+                cls.edit_progress(context, details, editable_entries, entry_instance)
                 progress[subject][book_name][session] = entry_instance.to_dict()
             else:
                 if CliPrompt.validate_choice(
                     f"\nAre you sure you want to delete all entries for {title}?",
-                    ["Y", "N"]) == "Y":
-                    progress[subject][book_name].pop(session)
-                    ProgressEditor.pop_empty_dicts(progress, subject, book_name)
-                    stats = deepcopy(data.stats)
-                    ProgressEditor.update_stats(details, entry_instance, stats, date=date)                    
-                    data.update_stats(stats)
+                    ["Y", "N"]) == "N":
+                    continue
+                progress[subject][book_name].pop(session)
+                ProgressEditor.pop_empty_dicts(progress, subject, book_name)
+                values = (entry_instance.pages, entry_instance.time_spent)
+                context.stats_manager.updater.update_stats(details, values, date=date)                    
                     
